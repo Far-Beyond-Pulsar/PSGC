@@ -1,0 +1,28 @@
+[package]
+name = "psgc"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Pulsar Shader Graph Compiler - WGSL shader generation from visual node graphs"
+license = "MIT"
+
+[dependencies]
+# General graph compilation library
+graphy = { path = "../../../Graphy" }
+
+# WGSL standard library
+wgsl_std = { path = "../wgsl_std" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+tracing-subscriber = "0.3"
+

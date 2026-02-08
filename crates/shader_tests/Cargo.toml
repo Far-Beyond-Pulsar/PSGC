@@ -1,0 +1,21 @@
+[package]
+name = "shader_tests"
+version = "0.1.0"
+edition = "2021"
+authors = ["Pulsar Team"]
+description = "Test suite for WGSL shader compilation"
+publish = false
+
+[dependencies]
+# Shader compiler
+psgc = { path = "../psgc" }
+
+# WGSL node library  
+wgsl_std = { path = "../wgsl_std" }
+
+# Graphy for graph construction
+graphy = { path = "../../../Graphy" }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"

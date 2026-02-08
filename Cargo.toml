@@ -1,24 +1,13 @@
-[package]
-name = "psgc"
-version = "0.1.0"
+[workspace]
+members = [
+    "crates/psgc",
+    "crates/wgsl_std",
+    "crates/shader_tests",
+]
+resolver = "2"
+
+[workspace.package]
 edition = "2021"
 authors = ["Pulsar Team"]
-description = "Pulsar Shader Graph Compiler - WGSL shader generation from visual node graphs"
 license = "MIT"
 
-[dependencies]
-# General graph compilation library
-graphy =  { git = "https://github.com/Far-Beyond-Pulsar/Graphy", rev = "0cd1d0c0e8420757f98c480ab9c4ab28e2f63ae0" }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Logging
-tracing = "0.1"
-
-# Error handling
-thiserror = "1.0"
-
-[dev-dependencies]
-tracing-subscriber = "0.3"
