@@ -53,8 +53,11 @@ pub use codegen::ShaderStage;
 pub use graphy::{
     GraphDescription, NodeInstance, Connection, Pin, PinInstance,
     DataType, NodeTypes, Position, ConnectionType, PropertyValue,
-    GraphMetadata, Result, GraphyError,
+    GraphMetadata, Result, GraphyError, PinType,
 };
+
+// Re-export core types
+pub use graphy::core::TypeInfo;
 
 // Re-export metadata types
 pub use metadata::{
