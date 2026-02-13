@@ -14,7 +14,7 @@ psgc = { path = "../psgc" }
 wgsl_std = { path = "../wgsl_std" }
 
 # Graphy for graph construction
-graphy = { path = "../../../Graphy" }
+graphy = { git = "https://github.com/Far-Beyond-Pulsar/Graphy.git", rev = "f8e8cae8daf47803a84ca9031f95eace4812e553" }
 
 # Logging
 tracing = "0.1"

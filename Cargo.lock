@@ -42,21 +42,6 @@ checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 [[package]]
 name = "graphy"
 version = "0.1.0"
-dependencies = [
- "quote",
- "rayon",
- "rustc-hash",
- "serde",
- "serde_json",
- "smallvec",
- "syn",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "graphy"
-version = "0.1.0"
 source = "git+https://github.com/Far-Beyond-Pulsar/Graphy.git?rev=f8e8cae8daf47803a84ca9031f95eace4812e553#f8e8cae8daf47803a84ca9031f95eace4812e553"
 dependencies = [
  "quote",
@@ -148,7 +133,7 @@ dependencies = [
 name = "psgc"
 version = "0.1.0"
 dependencies = [
- "graphy 0.1.0 (git+https://github.com/Far-Beyond-Pulsar/Graphy.git?rev=f8e8cae8daf47803a84ca9031f95eace4812e553)",
+ "graphy",
  "serde",
  "serde_json",
  "thiserror",
@@ -239,7 +224,7 @@ dependencies = [
 name = "shader_tests"
 version = "0.1.0"
 dependencies = [
- "graphy 0.1.0",
+ "graphy",
  "psgc",
  "tracing",
  "tracing-subscriber",
@@ -374,7 +359,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 name = "wgsl_std"
 version = "0.1.0"
 dependencies = [
- "graphy 0.1.0",
+ "graphy",
  "linkme",
  "serde",
  "tracing",

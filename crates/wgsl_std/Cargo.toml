@@ -17,7 +17,7 @@ serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
 
 # Re-export graphy types
-graphy = { path = "../../../Graphy" }
+graphy = { git = "https://github.com/Far-Beyond-Pulsar/Graphy.git", rev = "f8e8cae8daf47803a84ca9031f95eace4812e553" }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
