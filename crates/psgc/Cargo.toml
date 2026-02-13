@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 # General graph compilation library
-graphy = { path = "../../../Graphy" }
+graphy = { git = "https://github.com/Far-Beyond-Pulsar/Graphy.git", rev = "f8e8cae8daf47803a84ca9031f95eace4812e553" }
 
 # WGSL standard library
 wgsl_std = { path = "../wgsl_std" }

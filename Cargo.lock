@@ -55,6 +55,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "graphy"
+version = "0.1.0"
+source = "git+https://github.com/Far-Beyond-Pulsar/Graphy.git?rev=f8e8cae8daf47803a84ca9031f95eace4812e553#f8e8cae8daf47803a84ca9031f95eace4812e553"
+dependencies = [
+ "quote",
+ "rayon",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "smallvec",
+ "syn",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -132,7 +148,7 @@ dependencies = [
 name = "psgc"
 version = "0.1.0"
 dependencies = [
- "graphy",
+ "graphy 0.1.0 (git+https://github.com/Far-Beyond-Pulsar/Graphy.git?rev=f8e8cae8daf47803a84ca9031f95eace4812e553)",
  "serde",
  "serde_json",
  "thiserror",
@@ -223,7 +239,7 @@ dependencies = [
 name = "shader_tests"
 version = "0.1.0"
 dependencies = [
- "graphy",
+ "graphy 0.1.0",
  "psgc",
  "tracing",
  "tracing-subscriber",
@@ -358,7 +374,7 @@ checksum = "ba73ea9cf16a25df0c8caa16c51acb937d5712a8429db78a3ee29d5dcacd3a65"
 name = "wgsl_std"
 version = "0.1.0"
 dependencies = [
- "graphy",
+ "graphy 0.1.0",
  "linkme",
  "serde",
  "tracing",
