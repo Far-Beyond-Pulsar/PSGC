@@ -8,6 +8,8 @@
 //! separate "entry"/execution node — the output node *is* the entry point,
 //! and the surrounding `@vertex`/`@fragment` function is generated around it.
 
+use std::collections::HashSet;
+
 use crate::metadata::ShaderMetadataProvider;
 use graphy::{DataResolver, DataSource, GraphDescription, GraphyError, NodeInstance, NodeMetadataProvider, ParamInfo};
 
@@ -115,9 +117,20 @@ impl<'a> WGSLCodeGenerator<'a> {
             ShaderStage::Compute => unreachable!("compute shaders are rejected in generate_shader"),
         };
 
-        // Emit a `let` binding for every pure node that the output depends
-        // on, in topological (dependency-first) order.
+        // Disconnected node chains (not reachable from the output) are
+        // allowed to be incomplete/invalid in the editor — only emit
+        // bindings for nodes the output actually depends on, in topological
+        // (dependency-first) order. Without this, an unused node with a
+        // dangling/invalid input could generate WGSL that fails to compile
+        // and crashes the renderer even though it has no effect on the
+        // result.
+        let reachable = self.reachable_nodes(output_node);
+
         for node_id in self.data_resolver.get_pure_evaluation_order() {
+            if !reachable.contains(node_id) {
+                continue;
+            }
+
             let node = self
                 .graph
                 .nodes
@@ -157,6 +170,34 @@ impl<'a> WGSLCodeGenerator<'a> {
         code.push_str("}\n");
 
         Ok(code)
+    }
+
+    /// Walk data connections backward from `output_node` to find every node
+    /// it (transitively) depends on. Nodes outside this set are dead code —
+    /// they don't feed into the shader's output — and are skipped during
+    /// codegen so a broken/incomplete chain sitting off to the side can't
+    /// produce invalid WGSL.
+    fn reachable_nodes(&self, output_node: &NodeInstance) -> HashSet<String> {
+        let mut visited = HashSet::new();
+        let mut stack = vec![output_node.id.clone()];
+
+        while let Some(node_id) = stack.pop() {
+            let Some(node) = self.graph.nodes.get(&node_id) else {
+                continue;
+            };
+
+            for pin in &node.inputs {
+                if let Some(DataSource::Connection { source_node_id, .. }) =
+                    self.data_resolver.get_input_source(&node_id, &pin.id)
+                {
+                    if visited.insert(source_node_id.clone()) {
+                        stack.push(source_node_id.clone());
+                    }
+                }
+            }
+        }
+
+        visited
     }
 
     /// Resolve the expression that should be substituted for a node input.
