@@ -111,6 +111,13 @@ impl<'a> WGSLCodeGenerator<'a> {
                 code.push_str("@fragment\n");
                 code.push_str("fn fragment_main(\n");
                 code.push_str("    @builtin(position) frag_coord: vec4<f32>,\n");
+                // Matches the preview renderer's hand-written vertex shader
+                // `VertexOutput` locations, so `frag_uv`/`frag_normal` input
+                // nodes can read the interpolated per-fragment values
+                // instead of always defaulting to zero.
+                code.push_str("    @location(0) uv: vec2<f32>,\n");
+                code.push_str("    @location(1) normal: vec3<f32>,\n");
+                code.push_str("    @location(2) world_pos: vec3<f32>,\n");
                 code.push_str(") -> @location(0) vec4<f32> {\n");
                 ("color", "vec4<f32>")
             }
@@ -232,6 +239,8 @@ impl<'a> WGSLCodeGenerator<'a> {
     fn input_binding(&self, node_type: &str, return_type: &str) -> String {
         match (self.stage, node_type) {
             (ShaderStage::Fragment, "frag_position") => "frag_coord".to_string(),
+            (ShaderStage::Fragment, "frag_uv") => "uv".to_string(),
+            (ShaderStage::Fragment, "frag_normal") => "normal".to_string(),
             (_, "time") => "uniforms.time".to_string(),
             _ => default_value_for_type(return_type),
         }
