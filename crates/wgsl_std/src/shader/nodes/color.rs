@@ -86,3 +86,26 @@ pub fn desaturate() -> NodeMetadata {
         )
 }
 
+// ============================================================================
+// Procedural Color
+// ============================================================================
+
+/// Shifting rainbow gradient, driven by a coordinate and a phase shift.
+///
+/// Uses the classic cosine-palette trick (Inigo Quilez): each channel is a
+/// cosine wave offset by a third of a turn, so `t` sweeping over `[0, 1]`
+/// cycles smoothly through the full rainbow. Adding `shift` (e.g. driven by
+/// time) animates the gradient.
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn rainbow() -> NodeMetadata {
+    NodeMetadata::new("rainbow", NodeTypes::pure, "Color")
+        .with_params(vec![
+            ParamInfo::new("uv", "vec2<f32>"),
+            ParamInfo::new("shift", "f32"),
+        ])
+        .with_return_type("vec4<f32>")
+        .with_source(
+            "vec4<f32>(0.5 + 0.5 * cos(6.28318530718 * ((uv.x + shift) + vec3<f32>(0.0, 0.33333333, 0.66666667))), 1.0)"
+        )
+}
+

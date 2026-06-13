@@ -1,14 +1,15 @@
 //! # WGSL Code Generator
 //!
 //! Generates WGSL shader code from node graphs.
+//!
+//! Shader graphs are **fully pure**: every node (math, color, texture, input)
+//! is a side-effect-free expression, and the graph is a single dataflow DAG
+//! that terminates in one `fragment_output`/`vertex_output` node. There is no
+//! separate "entry"/execution node — the output node *is* the entry point,
+//! and the surrounding `@vertex`/`@fragment` function is generated around it.
 
 use crate::metadata::ShaderMetadataProvider;
-use graphy::{
-    GraphDescription, GraphyError, NodeTypes, NodeInstance,
-    DataResolver, ExecutionRouting,
-};
-use graphy::core::NodeMetadataProvider;
-use std::collections::{HashMap, HashSet};
+use graphy::{DataResolver, DataSource, GraphDescription, GraphyError, NodeInstance, NodeMetadataProvider, ParamInfo};
 
 /// Shader stage type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,9 +24,7 @@ pub struct WGSLCodeGenerator<'a> {
     graph: &'a GraphDescription,
     metadata_provider: &'a ShaderMetadataProvider,
     data_resolver: &'a DataResolver,
-    exec_routing: &'a ExecutionRouting,
     stage: ShaderStage,
-    visited: HashSet<String>,
 }
 
 impl<'a> WGSLCodeGenerator<'a> {
@@ -33,16 +32,13 @@ impl<'a> WGSLCodeGenerator<'a> {
         graph: &'a GraphDescription,
         metadata_provider: &'a ShaderMetadataProvider,
         data_resolver: &'a DataResolver,
-        exec_routing: &'a ExecutionRouting,
         stage: ShaderStage,
     ) -> Self {
         Self {
             graph,
             metadata_provider,
             data_resolver,
-            exec_routing,
             stage,
-            visited: HashSet::new(),
         }
     }
 
@@ -55,273 +51,202 @@ impl<'a> WGSLCodeGenerator<'a> {
         code.push_str("// DO NOT EDIT - Changes will be overwritten\n");
         code.push_str("// Compiled with PSGC (Pulsar Shader Graph Compiler)\n\n");
 
-        // Find entry point based on stage
-        let entry_node_type = match self.stage {
-            ShaderStage::Vertex => "vertex_main",
-            ShaderStage::Fragment => "fragment_main",
-            ShaderStage::Compute => "compute_main",
+        // A pure shader graph's entry point is its output node — there is no
+        // separate event/exec entry node to look for.
+        let output_node_type = match self.stage {
+            ShaderStage::Vertex => "vertex_output",
+            ShaderStage::Fragment => "fragment_output",
+            ShaderStage::Compute => {
+                return Err(GraphyError::CodeGeneration(
+                    "Compute shaders are not yet supported by the shader graph compiler".to_string(),
+                ));
+            }
         };
 
-        let entry_nodes: Vec<_> = self.graph
+        let output_node = self
+            .graph
             .nodes
             .values()
-            .filter(|node| node.node_type == entry_node_type)
-            .collect();
+            .find(|node| node.node_type == output_node_type)
+            .ok_or_else(|| {
+                GraphyError::CodeGeneration(format!(
+                    "No {} node found in graph — every shader graph needs exactly one output node",
+                    output_node_type
+                ))
+            })?;
 
-        if entry_nodes.is_empty() {
-            return Err(GraphyError::CodeGeneration(format!(
-                "No {} entry point found in graph",
-                entry_node_type
-            )));
-        }
-
-        // Generate entry function
-        for entry_node in entry_nodes {
-            let entry_code = self.generate_entry_function(entry_node)?;
-            code.push_str(&entry_code);
-            code.push_str("\n");
-        }
+        code.push_str(&self.generate_entry_function(output_node)?);
 
         Ok(code)
     }
 
-    /// Generate entry function
-    fn generate_entry_function(&self, entry_node: &NodeInstance) -> Result<String, GraphyError> {
+    /// Generate the `@vertex`/`@fragment` entry function that wraps the pure
+    /// dataflow graph feeding into `output_node`.
+    fn generate_entry_function(&self, output_node: &NodeInstance) -> Result<String, GraphyError> {
         let mut code = String::new();
 
-        // Get entry metadata
-        let metadata = self.metadata_provider
-            .get_node_metadata(&entry_node.node_type)
-            .ok_or_else(|| GraphyError::NodeNotFound(entry_node.node_type.clone()))?;
+        // Always declare the host-provided `uniforms` binding (matching the
+        // preview renderer's vertex shader) so the generated fragment
+        // module's bind group layout stays compatible whether or not this
+        // particular graph reads from it (e.g. via the `time` input node).
+        code.push_str("struct Uniforms {\n");
+        code.push_str("    view_proj: mat4x4<f32>,\n");
+        code.push_str("    model: mat4x4<f32>,\n");
+        code.push_str("    time: f32,\n");
+        code.push_str("};\n\n");
+        code.push_str("@group(0) @binding(0) var<uniform> uniforms: Uniforms;\n\n");
 
         // Generate function signature based on stage
-        match self.stage {
+        let (output_param, output_type) = match self.stage {
             ShaderStage::Vertex => {
                 code.push_str("@vertex\n");
                 code.push_str("fn vertex_main(\n");
                 code.push_str("    @builtin(vertex_index) vertex_index: u32,\n");
                 code.push_str(") -> @builtin(position) vec4<f32> {\n");
+                ("position", "vec4<f32>")
             }
             ShaderStage::Fragment => {
                 code.push_str("@fragment\n");
                 code.push_str("fn fragment_main(\n");
                 code.push_str("    @builtin(position) frag_coord: vec4<f32>,\n");
                 code.push_str(") -> @location(0) vec4<f32> {\n");
+                ("color", "vec4<f32>")
             }
-            ShaderStage::Compute => {
-                code.push_str("@compute @workgroup_size(8, 8, 1)\n");
-                code.push_str("fn compute_main(\n");
-                code.push_str("    @builtin(global_invocation_id) global_id: vec3<u32>,\n");
-                code.push_str(") {\n");
-            }
-        }
+            ShaderStage::Compute => unreachable!("compute shaders are rejected in generate_shader"),
+        };
 
-        // Generate body
-        if let Some(body_pin) = metadata.exec_outputs.first() {
-            let connected = self.exec_routing.get_connected_nodes(&entry_node.id, body_pin);
-            for next_node_id in connected {
-                if let Some(next_node) = self.graph.nodes.get(next_node_id) {
-                    let mut generator = self.clone_with_new_visited();
-                    let node_code = generator.generate_node_chain(next_node, 1)?;
-                    code.push_str(&node_code);
+        // Emit a `let` binding for every pure node that the output depends
+        // on, in topological (dependency-first) order.
+        for node_id in self.data_resolver.get_pure_evaluation_order() {
+            let node = self
+                .graph
+                .nodes
+                .get(node_id)
+                .ok_or_else(|| GraphyError::NodeNotFound(node_id.clone()))?;
+            let node_meta = self
+                .metadata_provider
+                .get_node_metadata(&node.node_type)
+                .ok_or_else(|| GraphyError::NodeNotFound(node.node_type.clone()))?;
+            let var_name = self
+                .data_resolver
+                .get_result_variable(node_id)
+                .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", node_id)))?;
+            let return_type = node_meta
+                .return_type
+                .as_ref()
+                .map(|t| t.type_string.as_str())
+                .unwrap_or("f32");
+
+            let expr = if node_meta.category == "Input" {
+                self.input_binding(&node.node_type, return_type)
+            } else {
+                let mut args = Vec::with_capacity(node_meta.params.len());
+                for param in &node_meta.params {
+                    args.push(self.generate_input_expression(node_id, &param.name, &param.param_type)?);
                 }
-            }
+                expand_function_source(&node_meta.function_source, &node_meta.params, &args)
+            };
+
+            code.push_str(&format!("    let {} = {};\n", var_name, expr));
         }
 
-        // Return statement based on stage
-        match self.stage {
-            ShaderStage::Vertex => {
-                code.push_str("    return vec4<f32>(0.0, 0.0, 0.0, 1.0);\n");
-            }
-            ShaderStage::Fragment => {
-                code.push_str("    return vec4<f32>(1.0, 0.0, 1.0, 1.0);\n");
-            }
-            ShaderStage::Compute => {}
-        }
-
+        // The function's return value is whatever flows into the output
+        // node's single parameter (defaulting if nothing is connected).
+        let final_expr = self.generate_input_expression(&output_node.id, output_param, output_type)?;
+        code.push_str(&format!("    return {};\n", final_expr));
         code.push_str("}\n");
 
         Ok(code)
     }
 
-    /// Generate node chain
-    fn generate_node_chain(&mut self, node: &NodeInstance, indent_level: usize) -> Result<String, GraphyError> {
-        let mut code = String::new();
-
-        // Prevent infinite loops
-        if self.visited.contains(&node.id) {
-            return Ok(code);
-        }
-        self.visited.insert(node.id.clone());
-
-        let node_meta = self.metadata_provider
-            .get_node_metadata(&node.node_type)
-            .ok_or_else(|| GraphyError::NodeNotFound(node.node_type.clone()))?;
-
-        match node_meta.node_type {
-            NodeTypes::pure => {
-                // Pure nodes are inlined as expressions
-                Ok(code)
-            }
-            NodeTypes::fn_ => {
-                self.generate_function_node(node, node_meta, indent_level)
-            }
-            NodeTypes::control_flow => {
-                self.generate_control_flow_node(node, node_meta, indent_level)
-            }
-            NodeTypes::event => {
-                // Event nodes are entry points
-                Ok(code)
-            }
-        }
-    }
-
-    /// Generate function node
-    fn generate_function_node(
-        &mut self,
-        node: &NodeInstance,
-        node_meta: &graphy::core::NodeMetadata,
-        indent_level: usize,
+    /// Resolve the expression that should be substituted for a node input.
+    ///
+    /// Since every pure node already has a `let` binding emitted (in
+    /// dependency order) before any of its dependents, a connected input is
+    /// simply a reference to that variable.
+    fn generate_input_expression(
+        &self,
+        node_id: &str,
+        pin_name: &str,
+        param_type: &str,
     ) -> Result<String, GraphyError> {
-        let mut code = String::new();
-        let indent = "    ".repeat(indent_level);
-
-        // Collect arguments
-        let args = self.collect_arguments(node, node_meta)?;
-
-        // Check if this function returns a value
-        let has_return = node_meta.return_type.is_some();
-
-        if has_return {
-            let result_var = self.data_resolver
-                .get_result_variable(&node.id)
-                .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", node.id)))?;
-
-            code.push_str(&format!(
-                "{}let {} = {}({});\n",
-                indent,
-                result_var,
-                self.map_function_name(&node_meta.name),
-                args.join(", ")
-            ));
-        } else {
-            code.push_str(&format!(
-                "{}{}({});\n",
-                indent,
-                self.map_function_name(&node_meta.name),
-                args.join(", ")
-            ));
-        }
-
-        // Follow execution chain
-        if let Some(exec_out) = node_meta.exec_outputs.first() {
-            let connected = self.exec_routing.get_connected_nodes(&node.id, exec_out);
-            for next_node_id in connected {
-                if let Some(next_node) = self.graph.nodes.get(next_node_id) {
-                    let next_code = self.generate_node_chain(next_node, indent_level)?;
-                    code.push_str(&next_code);
-                }
-            }
-        }
-
-        Ok(code)
-    }
-
-    /// Generate control flow node
-    fn generate_control_flow_node(
-        &mut self,
-        _node: &NodeInstance,
-        _node_meta: &graphy::core::NodeMetadata,
-        indent_level: usize,
-    ) -> Result<String, GraphyError> {
-        let indent = "    ".repeat(indent_level);
-        // Placeholder for control flow
-        Ok(format!("{}// Control flow node\n", indent))
-    }
-
-    /// Collect arguments for a function call
-    fn collect_arguments(&self, node: &NodeInstance, node_meta: &graphy::core::NodeMetadata) -> Result<Vec<String>, GraphyError> {
-        let mut args = Vec::new();
-
-        for param in &node_meta.params {
-            let value = self.generate_input_expression(&node.id, &param.name)?;
-            args.push(value);
-        }
-
-        Ok(args)
-    }
-
-    /// Generate expression for an input value
-    fn generate_input_expression(&self, node_id: &str, pin_name: &str) -> Result<String, GraphyError> {
-        use graphy::analysis::DataSource;
-
         match self.data_resolver.get_input_source(node_id, pin_name) {
-            Some(DataSource::Connection { source_node_id, source_pin: _ }) => {
-                let source_node = self.graph.nodes.get(source_node_id)
-                    .ok_or_else(|| GraphyError::NodeNotFound(source_node_id.clone()))?;
-
-                // Check if source is pure - if so, inline it
-                if let Some(node_meta) = self.metadata_provider.get_node_metadata(&source_node.node_type) {
-                    if node_meta.node_type == NodeTypes::pure {
-                        return self.generate_pure_node_expression(source_node);
-                    }
-                }
-
-                // Non-pure: use result variable
-                if let Some(var_name) = self.data_resolver.get_result_variable(source_node_id) {
-                    Ok(var_name.clone())
-                } else {
-                    Err(GraphyError::Custom(format!("No variable for source node: {}", source_node_id)))
-                }
-            }
+            Some(DataSource::Connection { source_node_id, .. }) => self
+                .data_resolver
+                .get_result_variable(source_node_id)
+                .cloned()
+                .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", source_node_id))),
             Some(DataSource::Constant(value)) => Ok(value.clone()),
-            Some(DataSource::Default) => {
-                Ok("0.0".to_string()) // WGSL default
+            Some(DataSource::Default) | None => Ok(default_value_for_type(param_type)),
+        }
+    }
+
+    /// Map a built-in "Input" category node (e.g. `frag_position`,
+    /// `vertex_uv`, `time`) to the WGSL expression that provides its value.
+    ///
+    /// `frag_position` maps to the `frag_coord` builtin parameter and `time`
+    /// maps to the host-provided `uniforms.time` binding (see
+    /// `generate_entry_function`); the remaining inputs are placeholders
+    /// until vertex-buffer/interstage wiring is added to PSGC.
+    fn input_binding(&self, node_type: &str, return_type: &str) -> String {
+        match (self.stage, node_type) {
+            (ShaderStage::Fragment, "frag_position") => "frag_coord".to_string(),
+            (_, "time") => "uniforms.time".to_string(),
+            _ => default_value_for_type(return_type),
+        }
+    }
+}
+
+/// Expand a node's `function_source` expression template, substituting each
+/// parameter name with its resolved argument expression.
+///
+/// `function_source` is a small WGSL expression written in terms of the
+/// node's own parameter names, e.g. `"a + b"` for `add` or `"mix(a, b, t)"`
+/// for `lerp`. Identifiers matching a parameter name are replaced with the
+/// (parenthesized) argument expression; everything else (operators, WGSL
+/// built-in function names, literals) is passed through unchanged.
+fn expand_function_source(source: &str, params: &[ParamInfo], args: &[String]) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let mut result = String::with_capacity(source.len());
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+        if c.is_alphabetic() || c == '_' {
+            let start = i;
+            while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
+                i += 1;
             }
-            None => Err(GraphyError::Custom(format!("No data source for input: {}.{}", node_id, pin_name))),
+            let ident: String = chars[start..i].iter().collect();
+            if let Some(pos) = params.iter().position(|p| p.name == ident) {
+                result.push('(');
+                result.push_str(&args[pos]);
+                result.push(')');
+            } else {
+                result.push_str(&ident);
+            }
+        } else {
+            result.push(c);
+            i += 1;
         }
     }
 
-    /// Generate inlined expression for a pure node
-    fn generate_pure_node_expression(&self, node: &NodeInstance) -> Result<String, GraphyError> {
-        let node_meta = self.metadata_provider
-            .get_node_metadata(&node.node_type)
-            .ok_or_else(|| GraphyError::NodeNotFound(node.node_type.clone()))?;
+    result
+}
 
-        // Recursively generate arguments
-        let mut args = Vec::new();
-        for param in &node_meta.params {
-            let arg_expr = self.generate_input_expression(&node.id, &param.name)?;
-            args.push(arg_expr);
-        }
-
-        Ok(format!("{}({})", self.map_function_name(&node_meta.name), args.join(", ")))
-    }
-
-    /// Map function names to WGSL built-ins
-    fn map_function_name(&self, name: &str) -> String {
-        match name {
-            "add" => "add",
-            "multiply" => "multiply",
-            "dot" => "dot",
-            "normalize" => "normalize",
-            "vec3" => "vec3<f32>",
-            "vec4" => "vec4<f32>",
-            "sample_texture" => "textureSample",
-            _ => name,
-        }
-        .to_string()
-    }
-
-    /// Clone with new visited set
-    fn clone_with_new_visited(&self) -> Self {
-        Self {
-            graph: self.graph,
-            metadata_provider: self.metadata_provider,
-            data_resolver: self.data_resolver,
-            exec_routing: self.exec_routing,
-            stage: self.stage,
-            visited: HashSet::new(),
-        }
+/// A sensible zero value for a WGSL type, used for unconnected inputs.
+///
+/// `vec4<f32>` defaults to opaque black (`w = 1.0`) since it's almost always
+/// used for colors or homogeneous positions, both of which want `w = 1.0`.
+fn default_value_for_type(type_str: &str) -> String {
+    match type_str {
+        "f32" => "0.0".to_string(),
+        "i32" => "0".to_string(),
+        "u32" => "0u".to_string(),
+        "bool" => "false".to_string(),
+        "vec2<f32>" => "vec2<f32>(0.0, 0.0)".to_string(),
+        "vec3<f32>" => "vec3<f32>(0.0, 0.0, 0.0)".to_string(),
+        "vec4<f32>" => "vec4<f32>(0.0, 0.0, 0.0, 1.0)".to_string(),
+        _ => "0.0".to_string(),
     }
 }

@@ -63,3 +63,17 @@ pub fn frag_normal() -> NodeMetadata {
         .with_source("frag_normal")
         }
 
+// ============================================================================
+// Global Inputs
+// ============================================================================
+
+/// Seconds elapsed since the shader started running. Backed by the preview
+/// renderer's `uniforms.time` binding — driving any expression with this
+/// animates it over time.
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn time() -> NodeMetadata {
+    NodeMetadata::new("time", NodeTypes::pure, "Input")
+        .with_return_type("f32")
+        .with_source("time")
+}
+
