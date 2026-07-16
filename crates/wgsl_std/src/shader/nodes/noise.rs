@@ -170,3 +170,177 @@ pub fn value_noise_3d() -> NodeMetadata {
         .with_helpers(&[PN_PCG3D, PN_HASH31, PN_VALUE_3D])
         .with_source("pn_value_3d(p, scale, seed)")
 }
+
+// ============================================================================
+// Perlin (gradient) noise
+// ============================================================================
+
+pub(crate) const PN_PERLIN_2D_RAW: (&str, &str) = ("pn_perlin_2d_raw", r#"fn pn_perlin_2d_raw(q: vec2<f32>) -> f32 {
+    let i = floor(q);
+    let f = fract(q);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let n00 = dot(pn_grad2(i), f);
+    let n10 = dot(pn_grad2(i + vec2<f32>(1.0, 0.0)), f - vec2<f32>(1.0, 0.0));
+    let n01 = dot(pn_grad2(i + vec2<f32>(0.0, 1.0)), f - vec2<f32>(0.0, 1.0));
+    let n11 = dot(pn_grad2(i + vec2<f32>(1.0, 1.0)), f - vec2<f32>(1.0, 1.0));
+    return mix(mix(n00, n10, u.x), mix(n01, n11, u.x), u.y) * 1.41421356;
+}"#);
+
+const PN_PERLIN_2D: (&str, &str) = ("pn_perlin_2d", r#"fn pn_perlin_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    return clamp(pn_perlin_2d_raw(q) * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+pub(crate) const PN_PERLIN_3D_RAW: (&str, &str) = ("pn_perlin_3d_raw", r#"fn pn_perlin_3d_raw(q: vec3<f32>) -> f32 {
+    let i = floor(q);
+    let f = fract(q);
+    let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    let n000 = dot(pn_grad3(i), f);
+    let n100 = dot(pn_grad3(i + vec3<f32>(1.0, 0.0, 0.0)), f - vec3<f32>(1.0, 0.0, 0.0));
+    let n010 = dot(pn_grad3(i + vec3<f32>(0.0, 1.0, 0.0)), f - vec3<f32>(0.0, 1.0, 0.0));
+    let n110 = dot(pn_grad3(i + vec3<f32>(1.0, 1.0, 0.0)), f - vec3<f32>(1.0, 1.0, 0.0));
+    let n001 = dot(pn_grad3(i + vec3<f32>(0.0, 0.0, 1.0)), f - vec3<f32>(0.0, 0.0, 1.0));
+    let n101 = dot(pn_grad3(i + vec3<f32>(1.0, 0.0, 1.0)), f - vec3<f32>(1.0, 0.0, 1.0));
+    let n011 = dot(pn_grad3(i + vec3<f32>(0.0, 1.0, 1.0)), f - vec3<f32>(0.0, 1.0, 1.0));
+    let n111 = dot(pn_grad3(i + vec3<f32>(1.0, 1.0, 1.0)), f - vec3<f32>(1.0, 1.0, 1.0));
+    let nx00 = mix(n000, n100, u.x);
+    let nx10 = mix(n010, n110, u.x);
+    let nx01 = mix(n001, n101, u.x);
+    let nx11 = mix(n011, n111, u.x);
+    return mix(mix(nx00, nx10, u.y), mix(nx01, nx11, u.y), u.z) * 1.15470054;
+}"#);
+
+const PN_PERLIN_3D: (&str, &str) = ("pn_perlin_3d", r#"fn pn_perlin_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    return clamp(pn_perlin_3d_raw(q) * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn perlin_2d() -> NodeMetadata {
+    NodeMetadata::new("perlin_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_GRAD2, PN_PERLIN_2D_RAW, PN_PERLIN_2D])
+        .with_source("pn_perlin_2d(p, scale, seed)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn perlin_3d() -> NodeMetadata {
+    NodeMetadata::new("perlin_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_PERLIN_3D_RAW, PN_PERLIN_3D])
+        .with_source("pn_perlin_3d(p, scale, seed)")
+}
+
+// ============================================================================
+// Simplex noise (Gustavson construction)
+// ============================================================================
+
+const PN_SIMPLEX_2D: (&str, &str) = ("pn_simplex_2d", r#"fn pn_simplex_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    let f2 = 0.36602540378;
+    let g2 = 0.21132486540;
+    let s = (q.x + q.y) * f2;
+    let i = floor(q + s);
+    let t = (i.x + i.y) * g2;
+    let x0 = q - (i - t);
+    var i1 = vec2<f32>(0.0, 1.0);
+    if (x0.x > x0.y) {
+        i1 = vec2<f32>(1.0, 0.0);
+    }
+    let x1 = x0 - i1 + g2;
+    let x2 = x0 - vec2<f32>(1.0, 1.0) + 2.0 * g2;
+    var n = vec3<f32>(0.0);
+    var t0 = 0.5 - dot(x0, x0);
+    if (t0 > 0.0) { t0 = t0 * t0; n.x = t0 * t0 * dot(pn_grad2(i), x0); }
+    var t1 = 0.5 - dot(x1, x1);
+    if (t1 > 0.0) { t1 = t1 * t1; n.y = t1 * t1 * dot(pn_grad2(i + i1), x1); }
+    var t2 = 0.5 - dot(x2, x2);
+    if (t2 > 0.0) { t2 = t2 * t2; n.z = t2 * t2 * dot(pn_grad2(i + vec2<f32>(1.0, 1.0)), x2); }
+    let v = 70.0 * (n.x + n.y + n.z);
+    return clamp(v * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+const PN_SIMPLEX_3D: (&str, &str) = ("pn_simplex_3d", r#"fn pn_simplex_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    let f3 = 1.0 / 3.0;
+    let g3 = 1.0 / 6.0;
+    let s = (q.x + q.y + q.z) * f3;
+    let i = floor(q + s);
+    let t = (i.x + i.y + i.z) * g3;
+    let x0 = q - (i - t);
+    var i1 = vec3<f32>(0.0, 0.0, 0.0);
+    var i2 = vec3<f32>(0.0, 0.0, 0.0);
+    if (x0.x >= x0.y) {
+        if (x0.y >= x0.z) {
+            i1 = vec3<f32>(1.0, 0.0, 0.0);
+            i2 = vec3<f32>(1.0, 1.0, 0.0);
+        } else if (x0.x >= x0.z) {
+            i1 = vec3<f32>(1.0, 0.0, 0.0);
+            i2 = vec3<f32>(1.0, 0.0, 1.0);
+        } else {
+            i1 = vec3<f32>(0.0, 0.0, 1.0);
+            i2 = vec3<f32>(1.0, 0.0, 1.0);
+        }
+    } else {
+        if (x0.y < x0.z) {
+            i1 = vec3<f32>(0.0, 0.0, 1.0);
+            i2 = vec3<f32>(0.0, 1.0, 1.0);
+        } else if (x0.x < x0.z) {
+            i1 = vec3<f32>(0.0, 1.0, 0.0);
+            i2 = vec3<f32>(0.0, 1.0, 1.0);
+        } else {
+            i1 = vec3<f32>(0.0, 1.0, 0.0);
+            i2 = vec3<f32>(1.0, 1.0, 0.0);
+        }
+    }
+    let x1 = x0 - i1 + g3;
+    let x2 = x0 - i2 + 2.0 * g3;
+    let x3 = x0 - vec3<f32>(1.0, 1.0, 1.0) + 3.0 * g3;
+    var n = vec4<f32>(0.0);
+    var t0 = 0.6 - dot(x0, x0);
+    if (t0 > 0.0) { t0 = t0 * t0; n.x = t0 * t0 * dot(pn_grad3(i), x0); }
+    var t1 = 0.6 - dot(x1, x1);
+    if (t1 > 0.0) { t1 = t1 * t1; n.y = t1 * t1 * dot(pn_grad3(i + i1), x1); }
+    var t2 = 0.6 - dot(x2, x2);
+    if (t2 > 0.0) { t2 = t2 * t2; n.z = t2 * t2 * dot(pn_grad3(i + i2), x2); }
+    var t3 = 0.6 - dot(x3, x3);
+    if (t3 > 0.0) { t3 = t3 * t3; n.w = t3 * t3 * dot(pn_grad3(i + vec3<f32>(1.0, 1.0, 1.0)), x3); }
+    let v = 32.0 * (n.x + n.y + n.z + n.w);
+    return clamp(v * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn simplex_2d() -> NodeMetadata {
+    NodeMetadata::new("simplex_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_GRAD2, PN_SIMPLEX_2D])
+        .with_source("pn_simplex_2d(p, scale, seed)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn simplex_3d() -> NodeMetadata {
+    NodeMetadata::new("simplex_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_SIMPLEX_3D])
+        .with_source("pn_simplex_3d(p, scale, seed)")
+}

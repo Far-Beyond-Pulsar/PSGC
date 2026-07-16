@@ -295,5 +295,12 @@ mod tests {
             assert_noise_node_compiles(node, &[]);
         }
     }
+
+    #[test]
+    fn noise_perlin_and_simplex_nodes_compile_and_validate() {
+        for node in ["perlin_2d", "perlin_3d", "simplex_2d", "simplex_3d"] {
+            assert_noise_node_compiles(node, &[]);
+        }
+    }
 }
 
