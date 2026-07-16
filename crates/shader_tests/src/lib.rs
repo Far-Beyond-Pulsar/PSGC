@@ -18,6 +18,25 @@ mod tests {
             .try_init();
     }
 
+    /// Parse + validate generated WGSL with naga. Panics with full
+    /// diagnostics on any syntax or type error — no GPU required.
+    fn validate_wgsl(wgsl: &str) {
+        let module = naga::front::wgsl::parse_str(wgsl)
+            .unwrap_or_else(|e| panic!("WGSL parse error: {}\n--- WGSL ---\n{wgsl}", e.emit_to_string(wgsl)));
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::default(),
+        )
+        .validate(&module)
+        .unwrap_or_else(|e| panic!("WGSL validation error: {e:?}\n--- WGSL ---\n{wgsl}"));
+    }
+
+    #[test]
+    fn validate_wgsl_rejects_garbage() {
+        let result = std::panic::catch_unwind(|| validate_wgsl("fn broken( -> {"));
+        assert!(result.is_err(), "garbage WGSL must fail validation");
+    }
+
     /// Test: Load all shader nodes from wgsl_std
     #[test]
     fn test_load_shader_nodes() {
@@ -198,10 +217,12 @@ mod tests {
                 println!("✓ Output written to: {}\n", output_path);
 
                 // Basic validation
-                assert!(wgsl_code.contains("@fragment") || wgsl_code.contains("fragment"), 
+                assert!(wgsl_code.contains("@fragment") || wgsl_code.contains("fragment"),
                     "Should have fragment shader marker");
                 // Note: Full data flow code generation not yet implemented
                 // assert!(wgsl_code.contains("sin"), "Should use sin function");
+
+                validate_wgsl(&wgsl_code);
             }
             Err(e) => {
                 panic!("✗ Shader compilation failed: {}", e);

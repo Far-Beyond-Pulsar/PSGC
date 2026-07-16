@@ -19,3 +19,6 @@ graphy = { git = "https://github.com/Far-Beyond-Pulsar/Graphy.git", rev = "f8e8c
 # Logging
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+[dev-dependencies]
+naga = { version = "30.0.0", features = ["wgsl-in"] }
