@@ -344,3 +344,281 @@ pub fn simplex_3d() -> NodeMetadata {
         .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_SIMPLEX_3D])
         .with_source("pn_simplex_3d(p, scale, seed)")
 }
+
+// ============================================================================
+// Voronoi / Worley — returns vec3(F1, F2, cell_random)
+// ============================================================================
+
+const PN_VORONOI_2D: (&str, &str) = ("pn_voronoi_2d", r#"fn pn_voronoi_2d(p: vec2<f32>, scale: f32, seed: f32) -> vec3<f32> {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    let i = floor(q);
+    let f = fract(q);
+    var f1 = 8.0;
+    var f2 = 8.0;
+    var cell = 0.0;
+    for (var y = -1; y <= 1; y = y + 1) {
+        for (var x = -1; x <= 1; x = x + 1) {
+            let n = vec2<f32>(f32(x), f32(y));
+            let o = pn_hash22(i + n);
+            let d = length(n + o - f);
+            if (d < f1) {
+                f2 = f1;
+                f1 = d;
+                cell = pn_hash21(i + n);
+            } else if (d < f2) {
+                f2 = d;
+            }
+        }
+    }
+    return vec3<f32>(f1, f2, cell);
+}"#);
+
+const PN_VORONOI_3D: (&str, &str) = ("pn_voronoi_3d", r#"fn pn_voronoi_3d(p: vec3<f32>, scale: f32, seed: f32) -> vec3<f32> {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    let i = floor(q);
+    let f = fract(q);
+    var f1 = 8.0;
+    var f2 = 8.0;
+    var cell = 0.0;
+    for (var z = -1; z <= 1; z = z + 1) {
+        for (var y = -1; y <= 1; y = y + 1) {
+            for (var x = -1; x <= 1; x = x + 1) {
+                let n = vec3<f32>(f32(x), f32(y), f32(z));
+                let o = pn_hash33(i + n);
+                let d = length(n + o - f);
+                if (d < f1) {
+                    f2 = f1;
+                    f1 = d;
+                    cell = pn_hash31(i + n);
+                } else if (d < f2) {
+                    f2 = d;
+                }
+            }
+        }
+    }
+    return vec3<f32>(f1, f2, cell);
+}"#);
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn voronoi_2d() -> NodeMetadata {
+    NodeMetadata::new("voronoi_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("vec3<f32>")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_HASH22, PN_VORONOI_2D])
+        .with_source("pn_voronoi_2d(p, scale, seed)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn voronoi_3d() -> NodeMetadata {
+    NodeMetadata::new("voronoi_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+        ])
+        .with_return_type("vec3<f32>")
+        .with_helpers(&[PN_PCG3D, PN_HASH31, PN_HASH33, PN_VORONOI_3D])
+        .with_source("pn_voronoi_3d(p, scale, seed)")
+}
+
+// ============================================================================
+// Fractal combinators over signed Perlin (octaves clamped 1..10)
+// ============================================================================
+
+const PN_FBM_2D: (&str, &str) = ("pn_fbm_2d", r#"fn pn_fbm_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        sum = sum + amp * pn_perlin_2d_raw(q * freq);
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp((sum / max(norm, 0.00001)) * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+const PN_FBM_3D: (&str, &str) = ("pn_fbm_3d", r#"fn pn_fbm_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        sum = sum + amp * pn_perlin_3d_raw(q * freq);
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp((sum / max(norm, 0.00001)) * 0.5 + 0.5, 0.0, 1.0);
+}"#);
+
+const PN_TURBULENCE_2D: (&str, &str) = ("pn_turbulence_2d", r#"fn pn_turbulence_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        sum = sum + amp * abs(pn_perlin_2d_raw(q * freq));
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
+}"#);
+
+const PN_TURBULENCE_3D: (&str, &str) = ("pn_turbulence_3d", r#"fn pn_turbulence_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        sum = sum + amp * abs(pn_perlin_3d_raw(q * freq));
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
+}"#);
+
+const PN_RIDGED_2D: (&str, &str) = ("pn_ridged_2d", r#"fn pn_ridged_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        let r = 1.0 - abs(pn_perlin_2d_raw(q * freq));
+        sum = sum + amp * r * r;
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
+}"#);
+
+const PN_RIDGED_3D: (&str, &str) = ("pn_ridged_3d", r#"fn pn_ridged_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+    let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
+    let n = i32(clamp(octaves, 1.0, 10.0));
+    var amp = 0.5;
+    var freq = 1.0;
+    var sum = 0.0;
+    var norm = 0.0;
+    for (var o = 0; o < n; o = o + 1) {
+        let r = 1.0 - abs(pn_perlin_3d_raw(q * freq));
+        sum = sum + amp * r * r;
+        norm = norm + amp;
+        freq = freq * lacunarity;
+        amp = amp * gain;
+    }
+    return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
+}"#);
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn fbm_2d() -> NodeMetadata {
+    NodeMetadata::new("fbm_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_GRAD2, PN_PERLIN_2D_RAW, PN_FBM_2D])
+        .with_source("pn_fbm_2d(p, scale, seed, octaves, lacunarity, gain)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn fbm_3d() -> NodeMetadata {
+    NodeMetadata::new("fbm_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_PERLIN_3D_RAW, PN_FBM_3D])
+        .with_source("pn_fbm_3d(p, scale, seed, octaves, lacunarity, gain)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn turbulence_2d() -> NodeMetadata {
+    NodeMetadata::new("turbulence_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_GRAD2, PN_PERLIN_2D_RAW, PN_TURBULENCE_2D])
+        .with_source("pn_turbulence_2d(p, scale, seed, octaves, lacunarity, gain)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn turbulence_3d() -> NodeMetadata {
+    NodeMetadata::new("turbulence_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_PERLIN_3D_RAW, PN_TURBULENCE_3D])
+        .with_source("pn_turbulence_3d(p, scale, seed, octaves, lacunarity, gain)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn ridged_2d() -> NodeMetadata {
+    NodeMetadata::new("ridged_2d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec2<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG2D, PN_HASH21, PN_GRAD2, PN_PERLIN_2D_RAW, PN_RIDGED_2D])
+        .with_source("pn_ridged_2d(p, scale, seed, octaves, lacunarity, gain)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn ridged_3d() -> NodeMetadata {
+    NodeMetadata::new("ridged_3d", NodeTypes::pure, "Noise")
+        .with_params(vec![
+            ParamInfo::new("p", "vec3<f32>"),
+            ParamInfo::new("scale", "f32"),
+            ParamInfo::new("seed", "f32"),
+            ParamInfo::new("octaves", "f32"),
+            ParamInfo::new("lacunarity", "f32"),
+            ParamInfo::new("gain", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_helpers(&[PN_PCG3D, PN_HASH33, PN_GRAD3, PN_PERLIN_3D_RAW, PN_RIDGED_3D])
+        .with_source("pn_ridged_3d(p, scale, seed, octaves, lacunarity, gain)")
+}

@@ -302,5 +302,95 @@ mod tests {
             assert_noise_node_compiles(node, &[]);
         }
     }
+
+    #[test]
+    fn noise_fractal_nodes_compile_and_validate() {
+        for node in ["fbm_2d", "fbm_3d", "turbulence_2d", "turbulence_3d", "ridged_2d", "ridged_3d"] {
+            assert_noise_node_compiles(node, &["octaves", "lacunarity", "gain"]);
+        }
+    }
+
+    /// voronoi (vec3 out) → vec3_x → rgba.r → fragment_output
+    #[test]
+    fn voronoi_output_splits_into_components() {
+        for (voronoi, ptype) in [("voronoi_2d", "vec2<f32>"), ("voronoi_3d", "vec3<f32>")] {
+            let mut graph = GraphDescription::new("voronoi_test");
+
+            let mut output = NodeInstance::new("output_1", "fragment_output", Position { x: 900.0, y: 200.0 });
+            output.inputs.push(PinInstance::new(
+                "output_1_color",
+                Pin::new("output_1_color", "color", DataType::typed("vec4<f32>"), PinType::Input),
+            ));
+
+            let mut rgba = NodeInstance::new("rgba_1", "rgba", Position { x: 700.0, y: 200.0 });
+            for ch in ["r", "g", "b", "a"] {
+                rgba.inputs.push(PinInstance::new(
+                    format!("rgba_1_{ch}"),
+                    Pin::new(format!("rgba_1_{ch}"), ch, DataType::typed("f32"), PinType::Input),
+                ));
+            }
+            rgba.outputs.push(PinInstance::new(
+                "rgba_1_result",
+                Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output),
+            ));
+
+            let mut split = NodeInstance::new("x_1", "vec3_x", Position { x: 600.0, y: 200.0 });
+            split.inputs.push(PinInstance::new(
+                "x_1_v",
+                Pin::new("x_1_v", "v", DataType::typed("vec3<f32>"), PinType::Input),
+            ));
+            split.outputs.push(PinInstance::new(
+                "x_1_result",
+                Pin::new("x_1_result", "result", DataType::typed("f32"), PinType::Output),
+            ));
+
+            let mut noise = NodeInstance::new("noise_1", voronoi, Position { x: 500.0, y: 200.0 });
+            noise.inputs.push(PinInstance::new(
+                "noise_1_p",
+                Pin::new("noise_1_p", "p", DataType::typed(ptype), PinType::Input),
+            ));
+            for param in ["scale", "seed"] {
+                noise.inputs.push(PinInstance::new(
+                    format!("noise_1_{param}"),
+                    Pin::new(format!("noise_1_{param}"), param, DataType::typed("f32"), PinType::Input),
+                ));
+            }
+            noise.outputs.push(PinInstance::new(
+                "noise_1_result",
+                Pin::new("noise_1_result", "result", DataType::typed("vec3<f32>"), PinType::Output),
+            ));
+
+            graph.add_node(output);
+            graph.add_node(rgba);
+            graph.add_node(split);
+            graph.add_node(noise);
+            graph.add_connection(Connection::new("noise_1", "noise_1_result", "x_1", "x_1_v", ConnectionType::Data));
+            graph.add_connection(Connection::new("x_1", "x_1_result", "rgba_1", "rgba_1_r", ConnectionType::Data));
+            graph.add_connection(Connection::new("rgba_1", "rgba_1_result", "output_1", "output_1_color", ConnectionType::Data));
+
+            let wgsl = compile_fragment_shader(&graph)
+                .unwrap_or_else(|e| panic!("{voronoi} failed to compile: {e}"));
+            validate_wgsl(&wgsl);
+        }
+    }
+
+    #[test]
+    fn all_sixteen_noise_nodes_registered() {
+        let provider = ShaderMetadataProvider::new();
+        let noise = provider.get_nodes_by_category("Noise");
+        let expected = [
+            "white_noise_2d", "white_noise_3d", "value_noise_2d", "value_noise_3d",
+            "perlin_2d", "perlin_3d", "simplex_2d", "simplex_3d",
+            "voronoi_2d", "voronoi_3d", "fbm_2d", "fbm_3d",
+            "turbulence_2d", "turbulence_3d", "ridged_2d", "ridged_3d",
+        ];
+        assert_eq!(noise.len(), expected.len(), "exactly 16 Noise nodes");
+        for name in expected {
+            assert!(noise.iter().any(|n| n.name == name), "missing node: {name}");
+        }
+        for name in ["vec3_x", "vec3_y", "vec3_z"] {
+            assert!(provider.get_node_metadata(name).is_some(), "missing vector node: {name}");
+        }
+    }
 }
 
