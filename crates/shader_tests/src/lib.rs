@@ -65,12 +65,12 @@ mod tests {
         // Node 1: fragment_output (entry point)
         let mut output = NodeInstance::new(
             "output_1",
-            "fragment_main",
+            "fragment_output",
             Position { x: 700.0, y: 200.0 }
         );
         output.outputs.push(PinInstance::new(
             "output_1_Body",
-            Pin::new("output_1_Body", "Body", DataType::Execution, PinType::Output)
+            Pin::new("output_1_Body", "Body", DataType::Exec, PinType::Output)
         ));
 
         // Node 2: rgba color constructor
@@ -81,29 +81,29 @@ mod tests {
         );
         rgba.inputs.push(PinInstance::new(
             "rgba_1_r",
-            Pin::new("rgba_1_r", "r", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_r", "r", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_g",
-            Pin::new("rgba_1_g", "g", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_g", "g", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_b",
-            Pin::new("rgba_1_b", "b", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_b", "b", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_a",
-            Pin::new("rgba_1_a", "a", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_a", "a", DataType::typed("f32"), PinType::Input)
         ));
         rgba.outputs.push(PinInstance::new(
             "rgba_1_result",
-            Pin::new("rgba_1_result", "result", DataType::Typed(psgc::TypeInfo::new("vec4<f32>")), PinType::Output)
+            Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output)
         ));
 
         // Set constant values
-        rgba.properties.insert("rgba_1_g".to_string(), PropertyValue::Number(0.0));
-        rgba.properties.insert("rgba_1_b".to_string(), PropertyValue::Number(0.0));
-        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Number(1.0));
+        rgba.properties.insert("rgba_1_g".to_string(), PropertyValue::Float(0.0).to_json());
+        rgba.properties.insert("rgba_1_b".to_string(), PropertyValue::Float(0.0).to_json());
+        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Float(1.0).to_json());
 
         // Node 3: sin
         let mut sin_node = NodeInstance::new(
@@ -113,11 +113,11 @@ mod tests {
         );
         sin_node.inputs.push(PinInstance::new(
             "sin_1_x",
-            Pin::new("sin_1_x", "x", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("sin_1_x", "x", DataType::typed("f32"), PinType::Input)
         ));
         sin_node.outputs.push(PinInstance::new(
             "sin_1_result",
-            Pin::new("sin_1_result", "result", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Output)
+            Pin::new("sin_1_result", "result", DataType::typed("f32"), PinType::Output)
         ));
 
         // Node 4: multiply
@@ -128,19 +128,19 @@ mod tests {
         );
         multiply.inputs.push(PinInstance::new(
             "multiply_1_a",
-            Pin::new("multiply_1_a", "a", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("multiply_1_a", "a", DataType::typed("f32"), PinType::Input)
         ));
         multiply.inputs.push(PinInstance::new(
             "multiply_1_b",
-            Pin::new("multiply_1_b", "b", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("multiply_1_b", "b", DataType::typed("f32"), PinType::Input)
         ));
         multiply.outputs.push(PinInstance::new(
             "multiply_1_result",
-            Pin::new("multiply_1_result", "result", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Output)
+            Pin::new("multiply_1_result", "result", DataType::typed("f32"), PinType::Output)
         ));
 
         // Constant multiplier
-        multiply.properties.insert("multiply_1_b".to_string(), PropertyValue::Number(6.28));
+        multiply.properties.insert("multiply_1_b".to_string(), PropertyValue::Float(6.28).to_json());
 
         // Node 5: frag_uv input
         let mut frag_uv = NodeInstance::new(
@@ -150,7 +150,7 @@ mod tests {
         );
         frag_uv.outputs.push(PinInstance::new(
             "uv_1_result",
-            Pin::new("uv_1_result", "result", DataType::Typed(psgc::TypeInfo::new("vec2<f32>")), PinType::Output)
+            Pin::new("uv_1_result", "result", DataType::typed("vec2<f32>"), PinType::Output)
         ));
 
         // Add all nodes
