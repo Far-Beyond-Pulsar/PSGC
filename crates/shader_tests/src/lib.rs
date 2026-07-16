@@ -231,5 +231,69 @@ mod tests {
 
         println!("✓ Test Passed! Math shader compiled successfully");
     }
+
+    /// Build: <noise node> (all params unconnected → defaults) → rgba.r → fragment_output.
+    /// `extra_params` are f32 input pin names beyond (p, scale, seed).
+    fn build_scalar_noise_graph(node_type: &str, extra_params: &[&str]) -> GraphDescription {
+        let mut graph = GraphDescription::new(&format!("{node_type}_test"));
+
+        let mut output = NodeInstance::new("output_1", "fragment_output", Position { x: 900.0, y: 200.0 });
+        output.inputs.push(PinInstance::new(
+            "output_1_color",
+            Pin::new("output_1_color", "color", DataType::typed("vec4<f32>"), PinType::Input),
+        ));
+
+        let mut rgba = NodeInstance::new("rgba_1", "rgba", Position { x: 700.0, y: 200.0 });
+        for ch in ["r", "g", "b", "a"] {
+            rgba.inputs.push(PinInstance::new(
+                format!("rgba_1_{ch}"),
+                Pin::new(format!("rgba_1_{ch}"), ch, DataType::typed("f32"), PinType::Input),
+            ));
+        }
+        rgba.outputs.push(PinInstance::new(
+            "rgba_1_result",
+            Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output),
+        ));
+        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Float(1.0).to_json());
+
+        let mut noise = NodeInstance::new("noise_1", node_type, Position { x: 500.0, y: 200.0 });
+        let p_type = if node_type.ends_with("_3d") { "vec3<f32>" } else { "vec2<f32>" };
+        noise.inputs.push(PinInstance::new(
+            "noise_1_p",
+            Pin::new("noise_1_p", "p", DataType::typed(p_type), PinType::Input),
+        ));
+        for param in ["scale", "seed"].iter().chain(extra_params.iter()) {
+            noise.inputs.push(PinInstance::new(
+                format!("noise_1_{param}"),
+                Pin::new(format!("noise_1_{param}"), *param, DataType::typed("f32"), PinType::Input),
+            ));
+        }
+        noise.outputs.push(PinInstance::new(
+            "noise_1_result",
+            Pin::new("noise_1_result", "result", DataType::typed("f32"), PinType::Output),
+        ));
+
+        graph.add_node(output);
+        graph.add_node(rgba);
+        graph.add_node(noise);
+        graph.add_connection(Connection::new("noise_1", "noise_1_result", "rgba_1", "rgba_1_r", ConnectionType::Data));
+        graph.add_connection(Connection::new("rgba_1", "rgba_1_result", "output_1", "output_1_color", ConnectionType::Data));
+        graph
+    }
+
+    fn assert_noise_node_compiles(node_type: &str, extra_params: &[&str]) {
+        let graph = build_scalar_noise_graph(node_type, extra_params);
+        let wgsl = compile_fragment_shader(&graph)
+            .unwrap_or_else(|e| panic!("{node_type} failed to compile: {e}"));
+        assert!(wgsl.contains("fn pn_"), "{node_type} must emit pn_ helper functions:\n{wgsl}");
+        validate_wgsl(&wgsl);
+    }
+
+    #[test]
+    fn noise_white_and_value_nodes_compile_and_validate() {
+        for node in ["white_noise_2d", "white_noise_3d", "value_noise_2d", "value_noise_3d"] {
+            assert_noise_node_compiles(node, &[]);
+        }
+    }
 }
 
