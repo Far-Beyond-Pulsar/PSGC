@@ -11,4 +11,7 @@ edition = "2021"
 authors = ["Pulsar Team"]
 license = "MIT"
 
+[workspace.dependencies]
+graphy = { path = "../graphy" }
+
 
