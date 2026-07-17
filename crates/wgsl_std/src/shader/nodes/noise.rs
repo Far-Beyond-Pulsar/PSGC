@@ -73,12 +73,12 @@ pub(crate) const PN_GRAD3: (&str, &str) = ("pn_grad3", r#"fn pn_grad3(ip: vec3<f
 // White noise
 // ============================================================================
 
-const PN_WHITE_2D: (&str, &str) = ("pn_white_2d", r#"fn pn_white_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_WHITE_2D: (&str, &str) = ("pn_white_2d", r#"fn pn_white_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     return pn_hash21(floor(q));
 }"#);
 
-const PN_WHITE_3D: (&str, &str) = ("pn_white_3d", r#"fn pn_white_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_WHITE_3D: (&str, &str) = ("pn_white_3d", r#"fn pn_white_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     return pn_hash31(floor(q));
 }"#);
@@ -113,7 +113,7 @@ pub fn white_noise_3d() -> NodeMetadata {
 // Value noise (quintic-interpolated lattice)
 // ============================================================================
 
-const PN_VALUE_2D: (&str, &str) = ("pn_value_2d", r#"fn pn_value_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_VALUE_2D: (&str, &str) = ("pn_value_2d", r#"fn pn_value_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let i = floor(q);
     let f = fract(q);
@@ -125,7 +125,7 @@ const PN_VALUE_2D: (&str, &str) = ("pn_value_2d", r#"fn pn_value_2d(p: vec2<f32>
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }"#);
 
-const PN_VALUE_3D: (&str, &str) = ("pn_value_3d", r#"fn pn_value_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_VALUE_3D: (&str, &str) = ("pn_value_3d", r#"fn pn_value_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let i = floor(q);
     let f = fract(q);
@@ -186,7 +186,7 @@ pub(crate) const PN_PERLIN_2D_RAW: (&str, &str) = ("pn_perlin_2d_raw", r#"fn pn_
     return mix(mix(n00, n10, u.x), mix(n01, n11, u.x), u.y) * 1.41421356;
 }"#);
 
-const PN_PERLIN_2D: (&str, &str) = ("pn_perlin_2d", r#"fn pn_perlin_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_PERLIN_2D: (&str, &str) = ("pn_perlin_2d", r#"fn pn_perlin_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     return clamp(pn_perlin_2d_raw(q) * 0.5 + 0.5, 0.0, 1.0);
 }"#);
@@ -210,7 +210,7 @@ pub(crate) const PN_PERLIN_3D_RAW: (&str, &str) = ("pn_perlin_3d_raw", r#"fn pn_
     return mix(mix(nx00, nx10, u.y), mix(nx01, nx11, u.y), u.z) * 1.15470054;
 }"#);
 
-const PN_PERLIN_3D: (&str, &str) = ("pn_perlin_3d", r#"fn pn_perlin_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_PERLIN_3D: (&str, &str) = ("pn_perlin_3d", r#"fn pn_perlin_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     return clamp(pn_perlin_3d_raw(q) * 0.5 + 0.5, 0.0, 1.0);
 }"#);
@@ -245,7 +245,7 @@ pub fn perlin_3d() -> NodeMetadata {
 // Simplex noise (Gustavson construction)
 // ============================================================================
 
-const PN_SIMPLEX_2D: (&str, &str) = ("pn_simplex_2d", r#"fn pn_simplex_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_SIMPLEX_2D: (&str, &str) = ("pn_simplex_2d", r#"fn pn_simplex_2d(p: vec2<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let f2 = 0.36602540378;
     let g2 = 0.21132486540;
@@ -270,7 +270,7 @@ const PN_SIMPLEX_2D: (&str, &str) = ("pn_simplex_2d", r#"fn pn_simplex_2d(p: vec
     return clamp(v * 0.5 + 0.5, 0.0, 1.0);
 }"#);
 
-const PN_SIMPLEX_3D: (&str, &str) = ("pn_simplex_3d", r#"fn pn_simplex_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
+pub(crate) const PN_SIMPLEX_3D: (&str, &str) = ("pn_simplex_3d", r#"fn pn_simplex_3d(p: vec3<f32>, scale: f32, seed: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let f3 = 1.0 / 3.0;
     let g3 = 1.0 / 6.0;
@@ -349,7 +349,7 @@ pub fn simplex_3d() -> NodeMetadata {
 // Voronoi / Worley — returns vec3(F1, F2, cell_random)
 // ============================================================================
 
-const PN_VORONOI_2D: (&str, &str) = ("pn_voronoi_2d", r#"fn pn_voronoi_2d(p: vec2<f32>, scale: f32, seed: f32) -> vec3<f32> {
+pub(crate) const PN_VORONOI_2D: (&str, &str) = ("pn_voronoi_2d", r#"fn pn_voronoi_2d(p: vec2<f32>, scale: f32, seed: f32) -> vec3<f32> {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let i = floor(q);
     let f = fract(q);
@@ -373,7 +373,7 @@ const PN_VORONOI_2D: (&str, &str) = ("pn_voronoi_2d", r#"fn pn_voronoi_2d(p: vec
     return vec3<f32>(f1, f2, cell);
 }"#);
 
-const PN_VORONOI_3D: (&str, &str) = ("pn_voronoi_3d", r#"fn pn_voronoi_3d(p: vec3<f32>, scale: f32, seed: f32) -> vec3<f32> {
+pub(crate) const PN_VORONOI_3D: (&str, &str) = ("pn_voronoi_3d", r#"fn pn_voronoi_3d(p: vec3<f32>, scale: f32, seed: f32) -> vec3<f32> {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let i = floor(q);
     let f = fract(q);
@@ -429,7 +429,7 @@ pub fn voronoi_3d() -> NodeMetadata {
 // Fractal combinators over signed Perlin (octaves clamped 1..10)
 // ============================================================================
 
-const PN_FBM_2D: (&str, &str) = ("pn_fbm_2d", r#"fn pn_fbm_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_FBM_2D: (&str, &str) = ("pn_fbm_2d", r#"fn pn_fbm_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;
@@ -445,7 +445,7 @@ const PN_FBM_2D: (&str, &str) = ("pn_fbm_2d", r#"fn pn_fbm_2d(p: vec2<f32>, scal
     return clamp((sum / max(norm, 0.00001)) * 0.5 + 0.5, 0.0, 1.0);
 }"#);
 
-const PN_FBM_3D: (&str, &str) = ("pn_fbm_3d", r#"fn pn_fbm_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_FBM_3D: (&str, &str) = ("pn_fbm_3d", r#"fn pn_fbm_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;
@@ -461,7 +461,7 @@ const PN_FBM_3D: (&str, &str) = ("pn_fbm_3d", r#"fn pn_fbm_3d(p: vec3<f32>, scal
     return clamp((sum / max(norm, 0.00001)) * 0.5 + 0.5, 0.0, 1.0);
 }"#);
 
-const PN_TURBULENCE_2D: (&str, &str) = ("pn_turbulence_2d", r#"fn pn_turbulence_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_TURBULENCE_2D: (&str, &str) = ("pn_turbulence_2d", r#"fn pn_turbulence_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;
@@ -477,7 +477,7 @@ const PN_TURBULENCE_2D: (&str, &str) = ("pn_turbulence_2d", r#"fn pn_turbulence_
     return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
 }"#);
 
-const PN_TURBULENCE_3D: (&str, &str) = ("pn_turbulence_3d", r#"fn pn_turbulence_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_TURBULENCE_3D: (&str, &str) = ("pn_turbulence_3d", r#"fn pn_turbulence_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;
@@ -493,7 +493,7 @@ const PN_TURBULENCE_3D: (&str, &str) = ("pn_turbulence_3d", r#"fn pn_turbulence_
     return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
 }"#);
 
-const PN_RIDGED_2D: (&str, &str) = ("pn_ridged_2d", r#"fn pn_ridged_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_RIDGED_2D: (&str, &str) = ("pn_ridged_2d", r#"fn pn_ridged_2d(p: vec2<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec2<f32>(seed * 127.1, seed * 311.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;
@@ -510,7 +510,7 @@ const PN_RIDGED_2D: (&str, &str) = ("pn_ridged_2d", r#"fn pn_ridged_2d(p: vec2<f
     return clamp(sum / max(norm, 0.00001), 0.0, 1.0);
 }"#);
 
-const PN_RIDGED_3D: (&str, &str) = ("pn_ridged_3d", r#"fn pn_ridged_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
+pub(crate) const PN_RIDGED_3D: (&str, &str) = ("pn_ridged_3d", r#"fn pn_ridged_3d(p: vec3<f32>, scale: f32, seed: f32, octaves: f32, lacunarity: f32, gain: f32) -> f32 {
     let q = (p + vec3<f32>(seed * 127.1, seed * 311.7, seed * 74.7)) * scale;
     let n = i32(clamp(octaves, 1.0, 10.0));
     var amp = 0.5;

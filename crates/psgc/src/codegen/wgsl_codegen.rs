@@ -83,6 +83,15 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
 
     /// Generate the `@vertex`/`@fragment` entry function that wraps the pure
     /// dataflow graph feeding into `output_node`.
+    ///
+    /// For the fragment stage the output node's params become the fields of a
+    /// `FragmentOutput` struct, each with a sequential `@location(N)` — this
+    /// lets the fragment shader output multiple PBR properties (base colour,
+    /// metallic, roughness, …) simultaneously.
+    ///
+    /// For the vertex stage a `VertexOutput` struct is emitted: the
+    /// `position` param becomes `@builtin(position)` and the remaining params
+    /// become interstage `@location` attributes.
     fn generate_entry_function(&self, output_node: &NodeInstance) -> Result<String, GraphyError> {
         let mut code = String::new();
 
@@ -133,30 +142,57 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             }
         }
 
-        // Generate function signature based on stage
-        let (output_param, output_type) = match self.stage {
-            ShaderStage::Vertex => {
-                code.push_str("@vertex\n");
-                code.push_str("fn vertex_main(\n");
-                code.push_str("    @builtin(vertex_index) vertex_index: u32,\n");
-                code.push_str(") -> @builtin(position) vec4<f32> {\n");
-                ("position", "vec4<f32>")
-            }
+        let output_meta = self
+            .metadata_provider
+            .get_node_metadata(&output_node.node_type)
+            .ok_or_else(|| GraphyError::NodeNotFound(output_node.node_type.clone()))?;
+
+        // Emit the output struct and function signature.
+        match self.stage {
             ShaderStage::Fragment => {
+                let struct_name = "FragmentOutput";
+                code.push_str(&format!("struct {} {{\n", struct_name));
+                for (i, param) in output_meta.params.iter().enumerate() {
+                    code.push_str(&format!("    @location({}) {}: {},\n", i, param.name, param.param_type));
+                }
+                code.push_str("};\n\n");
+
                 code.push_str("@fragment\n");
                 code.push_str("fn fragment_main(\n");
                 code.push_str("    @builtin(position) frag_coord: vec4<f32>,\n");
-                // Matches the preview renderer's hand-written vertex shader
-                // `VertexOutput` locations, so `frag_uv`/`frag_normal` input
-                // nodes can read the interpolated per-fragment values
-                // instead of always defaulting to zero.
                 code.push_str("    @location(0) uv: vec2<f32>,\n");
                 code.push_str("    @location(1) normal: vec3<f32>,\n");
                 code.push_str("    @location(2) world_pos: vec3<f32>,\n");
-                code.push_str(") -> @location(0) vec4<f32> {\n");
-                ("color", "vec4<f32>")
+                code.push_str(&format!(") -> {} {{\n", struct_name));
             }
-            ShaderStage::Compute => unreachable!("compute shaders are rejected in generate_shader"),
+            ShaderStage::Vertex => {
+                let struct_name = "VertexOutput";
+                let mut loc_idx = 0u32;
+                code.push_str(&format!("struct {} {{\n", struct_name));
+                for param in &output_meta.params {
+                    if param.name == "position" {
+                        code.push_str(&format!(
+                            "    @builtin(position) {}: {},\n",
+                            param.name, param.param_type
+                        ));
+                    } else {
+                        code.push_str(&format!(
+                            "    @location({}) {}: {},\n",
+                            loc_idx, param.name, param.param_type
+                        ));
+                        loc_idx += 1;
+                    }
+                }
+                code.push_str("};\n\n");
+
+                code.push_str("@vertex\n");
+                code.push_str("fn vertex_main(\n");
+                code.push_str("    @builtin(vertex_index) vertex_index: u32,\n");
+                code.push_str(&format!(") -> {} {{\n", struct_name));
+            }
+            ShaderStage::Compute => {
+                unreachable!("compute shaders are rejected in generate_shader")
+            }
         };
 
         // Disconnected node chains (not reachable from the output) are
@@ -203,10 +239,24 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             code.push_str(&format!("    let {} = {};\n", var_name, expr));
         }
 
-        // The function's return value is whatever flows into the output
-        // node's single parameter (defaulting if nothing is connected).
-        let final_expr = self.generate_input_expression(&output_node.id, output_param, output_type)?;
-        code.push_str(&format!("    return {};\n", final_expr));
+        // Build the struct literal from the output node's params.  Each
+        // field resolves to whatever is connected (or a type-appropriate
+        // default if nothing is connected).
+        let struct_name = match self.stage {
+            ShaderStage::Fragment => "FragmentOutput",
+            ShaderStage::Vertex => "VertexOutput",
+            ShaderStage::Compute => unreachable!(),
+        };
+        code.push_str(&format!("    return {}(", struct_name));
+        for (j, param) in output_meta.params.iter().enumerate() {
+            if j > 0 {
+                code.push_str(", ");
+            }
+            let expr =
+                self.generate_input_expression(&output_node.id, &param.name, &param.param_type)?;
+            code.push_str(&expr);
+        }
+        code.push_str(");\n");
         code.push_str("}\n");
 
         Ok(code)

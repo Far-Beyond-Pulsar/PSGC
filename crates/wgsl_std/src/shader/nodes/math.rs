@@ -161,3 +161,115 @@ pub fn fract() -> NodeMetadata {
         .with_source("fract(x)")
 }
 
+// ============================================================================
+// Rounding
+// ============================================================================
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn floor() -> NodeMetadata {
+    NodeMetadata::new("floor", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("floor(x)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn ceil() -> NodeMetadata {
+    NodeMetadata::new("ceil", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("ceil(x)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn round() -> NodeMetadata {
+    NodeMetadata::new("round", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("round(x)")
+}
+
+// ============================================================================
+// Comparison / Limiting
+// ============================================================================
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn math_min() -> NodeMetadata {
+    NodeMetadata::new("min", NodeTypes::pure, "Math")
+        .with_params(vec![
+            ParamInfo::new("a", "f32"),
+            ParamInfo::new("b", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_source("min(a, b)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn math_max() -> NodeMetadata {
+    NodeMetadata::new("max", NodeTypes::pure, "Math")
+        .with_params(vec![
+            ParamInfo::new("a", "f32"),
+            ParamInfo::new("b", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_source("max(a, b)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn saturate() -> NodeMetadata {
+    NodeMetadata::new("saturate", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("clamp(x, 0.0, 1.0)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn step() -> NodeMetadata {
+    NodeMetadata::new("step", NodeTypes::pure, "Math")
+        .with_params(vec![
+            ParamInfo::new("edge", "f32"),
+            ParamInfo::new("x", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_source("step(edge, x)")
+}
+
+// ============================================================================
+// Other
+// ============================================================================
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn math_sign() -> NodeMetadata {
+    NodeMetadata::new("sign", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("sign(x)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn modulo() -> NodeMetadata {
+    NodeMetadata::new("modulo", NodeTypes::pure, "Math")
+        .with_params(vec![
+            ParamInfo::new("a", "f32"),
+            ParamInfo::new("b", "f32"),
+        ])
+        .with_return_type("f32")
+        .with_source("a - b * floor(a / b)")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn square() -> NodeMetadata {
+    NodeMetadata::new("square", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("x * x")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn negate() -> NodeMetadata {
+    NodeMetadata::new("negate", NodeTypes::pure, "Math")
+        .with_params(vec![ParamInfo::new("x", "f32")])
+        .with_return_type("f32")
+        .with_source("-x")
+}
+
