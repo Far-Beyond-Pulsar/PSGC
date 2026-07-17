@@ -110,3 +110,27 @@ pub fn vec3_split() -> NodeMetadata {
         .with_return_type("vec3<f32>")
         .with_source("v")
 }
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn vec3_x() -> NodeMetadata {
+    NodeMetadata::new("vec3_x", NodeTypes::pure, "Vector")
+        .with_params(vec![ParamInfo::new("v", "vec3<f32>")])
+        .with_return_type("f32")
+        .with_source("v.x")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn vec3_y() -> NodeMetadata {
+    NodeMetadata::new("vec3_y", NodeTypes::pure, "Vector")
+        .with_params(vec![ParamInfo::new("v", "vec3<f32>")])
+        .with_return_type("f32")
+        .with_source("v.y")
+}
+
+#[distributed_slice(SHADER_REGISTRY)]
+pub fn vec3_z() -> NodeMetadata {
+    NodeMetadata::new("vec3_z", NodeTypes::pure, "Vector")
+        .with_params(vec![ParamInfo::new("v", "vec3<f32>")])
+        .with_return_type("f32")
+        .with_source("v.z")
+}

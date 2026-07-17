@@ -1,4 +1,5 @@
 pub mod math;
+pub mod noise;
 pub mod vector;
 pub mod color;
 pub mod texture;
@@ -7,6 +8,7 @@ pub mod output;
 
 // Re-export for easy access
 pub use math::*;
+pub use noise::*;
 pub use vector::*;
 pub use color::*;
 pub use texture::*;

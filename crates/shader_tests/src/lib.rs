@@ -18,6 +18,25 @@ mod tests {
             .try_init();
     }
 
+    /// Parse + validate generated WGSL with naga. Panics with full
+    /// diagnostics on any syntax or type error — no GPU required.
+    fn validate_wgsl(wgsl: &str) {
+        let module = naga::front::wgsl::parse_str(wgsl)
+            .unwrap_or_else(|e| panic!("WGSL parse error: {}\n--- WGSL ---\n{wgsl}", e.emit_to_string(wgsl)));
+        naga::valid::Validator::new(
+            naga::valid::ValidationFlags::all(),
+            naga::valid::Capabilities::default(),
+        )
+        .validate(&module)
+        .unwrap_or_else(|e| panic!("WGSL validation error: {e:?}\n--- WGSL ---\n{wgsl}"));
+    }
+
+    #[test]
+    fn validate_wgsl_rejects_garbage() {
+        let result = std::panic::catch_unwind(|| validate_wgsl("fn broken( -> {"));
+        assert!(result.is_err(), "garbage WGSL must fail validation");
+    }
+
     /// Test: Load all shader nodes from wgsl_std
     #[test]
     fn test_load_shader_nodes() {
@@ -65,12 +84,12 @@ mod tests {
         // Node 1: fragment_output (entry point)
         let mut output = NodeInstance::new(
             "output_1",
-            "fragment_main",
+            "fragment_output",
             Position { x: 700.0, y: 200.0 }
         );
         output.outputs.push(PinInstance::new(
             "output_1_Body",
-            Pin::new("output_1_Body", "Body", DataType::Execution, PinType::Output)
+            Pin::new("output_1_Body", "Body", DataType::Exec, PinType::Output)
         ));
 
         // Node 2: rgba color constructor
@@ -81,29 +100,29 @@ mod tests {
         );
         rgba.inputs.push(PinInstance::new(
             "rgba_1_r",
-            Pin::new("rgba_1_r", "r", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_r", "r", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_g",
-            Pin::new("rgba_1_g", "g", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_g", "g", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_b",
-            Pin::new("rgba_1_b", "b", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_b", "b", DataType::typed("f32"), PinType::Input)
         ));
         rgba.inputs.push(PinInstance::new(
             "rgba_1_a",
-            Pin::new("rgba_1_a", "a", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("rgba_1_a", "a", DataType::typed("f32"), PinType::Input)
         ));
         rgba.outputs.push(PinInstance::new(
             "rgba_1_result",
-            Pin::new("rgba_1_result", "result", DataType::Typed(psgc::TypeInfo::new("vec4<f32>")), PinType::Output)
+            Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output)
         ));
 
         // Set constant values
-        rgba.properties.insert("rgba_1_g".to_string(), PropertyValue::Number(0.0));
-        rgba.properties.insert("rgba_1_b".to_string(), PropertyValue::Number(0.0));
-        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Number(1.0));
+        rgba.properties.insert("rgba_1_g".to_string(), PropertyValue::Float(0.0).to_json());
+        rgba.properties.insert("rgba_1_b".to_string(), PropertyValue::Float(0.0).to_json());
+        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Float(1.0).to_json());
 
         // Node 3: sin
         let mut sin_node = NodeInstance::new(
@@ -113,11 +132,11 @@ mod tests {
         );
         sin_node.inputs.push(PinInstance::new(
             "sin_1_x",
-            Pin::new("sin_1_x", "x", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("sin_1_x", "x", DataType::typed("f32"), PinType::Input)
         ));
         sin_node.outputs.push(PinInstance::new(
             "sin_1_result",
-            Pin::new("sin_1_result", "result", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Output)
+            Pin::new("sin_1_result", "result", DataType::typed("f32"), PinType::Output)
         ));
 
         // Node 4: multiply
@@ -128,19 +147,19 @@ mod tests {
         );
         multiply.inputs.push(PinInstance::new(
             "multiply_1_a",
-            Pin::new("multiply_1_a", "a", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("multiply_1_a", "a", DataType::typed("f32"), PinType::Input)
         ));
         multiply.inputs.push(PinInstance::new(
             "multiply_1_b",
-            Pin::new("multiply_1_b", "b", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Input)
+            Pin::new("multiply_1_b", "b", DataType::typed("f32"), PinType::Input)
         ));
         multiply.outputs.push(PinInstance::new(
             "multiply_1_result",
-            Pin::new("multiply_1_result", "result", DataType::Typed(psgc::TypeInfo::new("f32")), PinType::Output)
+            Pin::new("multiply_1_result", "result", DataType::typed("f32"), PinType::Output)
         ));
 
         // Constant multiplier
-        multiply.properties.insert("multiply_1_b".to_string(), PropertyValue::Number(6.28));
+        multiply.properties.insert("multiply_1_b".to_string(), PropertyValue::Float(6.28).to_json());
 
         // Node 5: frag_uv input
         let mut frag_uv = NodeInstance::new(
@@ -150,7 +169,7 @@ mod tests {
         );
         frag_uv.outputs.push(PinInstance::new(
             "uv_1_result",
-            Pin::new("uv_1_result", "result", DataType::Typed(psgc::TypeInfo::new("vec2<f32>")), PinType::Output)
+            Pin::new("uv_1_result", "result", DataType::typed("vec2<f32>"), PinType::Output)
         ));
 
         // Add all nodes
@@ -198,10 +217,12 @@ mod tests {
                 println!("✓ Output written to: {}\n", output_path);
 
                 // Basic validation
-                assert!(wgsl_code.contains("@fragment") || wgsl_code.contains("fragment"), 
+                assert!(wgsl_code.contains("@fragment") || wgsl_code.contains("fragment"),
                     "Should have fragment shader marker");
                 // Note: Full data flow code generation not yet implemented
                 // assert!(wgsl_code.contains("sin"), "Should use sin function");
+
+                validate_wgsl(&wgsl_code);
             }
             Err(e) => {
                 panic!("✗ Shader compilation failed: {}", e);
@@ -209,6 +230,167 @@ mod tests {
         }
 
         println!("✓ Test Passed! Math shader compiled successfully");
+    }
+
+    /// Build: <noise node> (all params unconnected → defaults) → rgba.r → fragment_output.
+    /// `extra_params` are f32 input pin names beyond (p, scale, seed).
+    fn build_scalar_noise_graph(node_type: &str, extra_params: &[&str]) -> GraphDescription {
+        let mut graph = GraphDescription::new(&format!("{node_type}_test"));
+
+        let mut output = NodeInstance::new("output_1", "fragment_output", Position { x: 900.0, y: 200.0 });
+        output.inputs.push(PinInstance::new(
+            "output_1_color",
+            Pin::new("output_1_color", "color", DataType::typed("vec4<f32>"), PinType::Input),
+        ));
+
+        let mut rgba = NodeInstance::new("rgba_1", "rgba", Position { x: 700.0, y: 200.0 });
+        for ch in ["r", "g", "b", "a"] {
+            rgba.inputs.push(PinInstance::new(
+                format!("rgba_1_{ch}"),
+                Pin::new(format!("rgba_1_{ch}"), ch, DataType::typed("f32"), PinType::Input),
+            ));
+        }
+        rgba.outputs.push(PinInstance::new(
+            "rgba_1_result",
+            Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output),
+        ));
+        rgba.properties.insert("rgba_1_a".to_string(), PropertyValue::Float(1.0).to_json());
+
+        let mut noise = NodeInstance::new("noise_1", node_type, Position { x: 500.0, y: 200.0 });
+        let p_type = if node_type.ends_with("_3d") { "vec3<f32>" } else { "vec2<f32>" };
+        noise.inputs.push(PinInstance::new(
+            "noise_1_p",
+            Pin::new("noise_1_p", "p", DataType::typed(p_type), PinType::Input),
+        ));
+        for param in ["scale", "seed"].iter().chain(extra_params.iter()) {
+            noise.inputs.push(PinInstance::new(
+                format!("noise_1_{param}"),
+                Pin::new(format!("noise_1_{param}"), *param, DataType::typed("f32"), PinType::Input),
+            ));
+        }
+        noise.outputs.push(PinInstance::new(
+            "noise_1_result",
+            Pin::new("noise_1_result", "result", DataType::typed("f32"), PinType::Output),
+        ));
+
+        graph.add_node(output);
+        graph.add_node(rgba);
+        graph.add_node(noise);
+        graph.add_connection(Connection::new("noise_1", "noise_1_result", "rgba_1", "rgba_1_r", ConnectionType::Data));
+        graph.add_connection(Connection::new("rgba_1", "rgba_1_result", "output_1", "output_1_color", ConnectionType::Data));
+        graph
+    }
+
+    fn assert_noise_node_compiles(node_type: &str, extra_params: &[&str]) {
+        let graph = build_scalar_noise_graph(node_type, extra_params);
+        let wgsl = compile_fragment_shader(&graph)
+            .unwrap_or_else(|e| panic!("{node_type} failed to compile: {e}"));
+        assert!(wgsl.contains("fn pn_"), "{node_type} must emit pn_ helper functions:\n{wgsl}");
+        validate_wgsl(&wgsl);
+    }
+
+    #[test]
+    fn noise_white_and_value_nodes_compile_and_validate() {
+        for node in ["white_noise_2d", "white_noise_3d", "value_noise_2d", "value_noise_3d"] {
+            assert_noise_node_compiles(node, &[]);
+        }
+    }
+
+    #[test]
+    fn noise_perlin_and_simplex_nodes_compile_and_validate() {
+        for node in ["perlin_2d", "perlin_3d", "simplex_2d", "simplex_3d"] {
+            assert_noise_node_compiles(node, &[]);
+        }
+    }
+
+    #[test]
+    fn noise_fractal_nodes_compile_and_validate() {
+        for node in ["fbm_2d", "fbm_3d", "turbulence_2d", "turbulence_3d", "ridged_2d", "ridged_3d"] {
+            assert_noise_node_compiles(node, &["octaves", "lacunarity", "gain"]);
+        }
+    }
+
+    /// voronoi (vec3 out) → vec3_x → rgba.r → fragment_output
+    #[test]
+    fn voronoi_output_splits_into_components() {
+        for (voronoi, ptype) in [("voronoi_2d", "vec2<f32>"), ("voronoi_3d", "vec3<f32>")] {
+            let mut graph = GraphDescription::new("voronoi_test");
+
+            let mut output = NodeInstance::new("output_1", "fragment_output", Position { x: 900.0, y: 200.0 });
+            output.inputs.push(PinInstance::new(
+                "output_1_color",
+                Pin::new("output_1_color", "color", DataType::typed("vec4<f32>"), PinType::Input),
+            ));
+
+            let mut rgba = NodeInstance::new("rgba_1", "rgba", Position { x: 700.0, y: 200.0 });
+            for ch in ["r", "g", "b", "a"] {
+                rgba.inputs.push(PinInstance::new(
+                    format!("rgba_1_{ch}"),
+                    Pin::new(format!("rgba_1_{ch}"), ch, DataType::typed("f32"), PinType::Input),
+                ));
+            }
+            rgba.outputs.push(PinInstance::new(
+                "rgba_1_result",
+                Pin::new("rgba_1_result", "result", DataType::typed("vec4<f32>"), PinType::Output),
+            ));
+
+            let mut split = NodeInstance::new("x_1", "vec3_x", Position { x: 600.0, y: 200.0 });
+            split.inputs.push(PinInstance::new(
+                "x_1_v",
+                Pin::new("x_1_v", "v", DataType::typed("vec3<f32>"), PinType::Input),
+            ));
+            split.outputs.push(PinInstance::new(
+                "x_1_result",
+                Pin::new("x_1_result", "result", DataType::typed("f32"), PinType::Output),
+            ));
+
+            let mut noise = NodeInstance::new("noise_1", voronoi, Position { x: 500.0, y: 200.0 });
+            noise.inputs.push(PinInstance::new(
+                "noise_1_p",
+                Pin::new("noise_1_p", "p", DataType::typed(ptype), PinType::Input),
+            ));
+            for param in ["scale", "seed"] {
+                noise.inputs.push(PinInstance::new(
+                    format!("noise_1_{param}"),
+                    Pin::new(format!("noise_1_{param}"), param, DataType::typed("f32"), PinType::Input),
+                ));
+            }
+            noise.outputs.push(PinInstance::new(
+                "noise_1_result",
+                Pin::new("noise_1_result", "result", DataType::typed("vec3<f32>"), PinType::Output),
+            ));
+
+            graph.add_node(output);
+            graph.add_node(rgba);
+            graph.add_node(split);
+            graph.add_node(noise);
+            graph.add_connection(Connection::new("noise_1", "noise_1_result", "x_1", "x_1_v", ConnectionType::Data));
+            graph.add_connection(Connection::new("x_1", "x_1_result", "rgba_1", "rgba_1_r", ConnectionType::Data));
+            graph.add_connection(Connection::new("rgba_1", "rgba_1_result", "output_1", "output_1_color", ConnectionType::Data));
+
+            let wgsl = compile_fragment_shader(&graph)
+                .unwrap_or_else(|e| panic!("{voronoi} failed to compile: {e}"));
+            validate_wgsl(&wgsl);
+        }
+    }
+
+    #[test]
+    fn all_sixteen_noise_nodes_registered() {
+        let provider = ShaderMetadataProvider::new();
+        let noise = provider.get_nodes_by_category("Noise");
+        let expected = [
+            "white_noise_2d", "white_noise_3d", "value_noise_2d", "value_noise_3d",
+            "perlin_2d", "perlin_3d", "simplex_2d", "simplex_3d",
+            "voronoi_2d", "voronoi_3d", "fbm_2d", "fbm_3d",
+            "turbulence_2d", "turbulence_3d", "ridged_2d", "ridged_3d",
+        ];
+        assert_eq!(noise.len(), expected.len(), "exactly 16 Noise nodes");
+        for name in expected {
+            assert!(noise.iter().any(|n| n.name == name), "missing node: {name}");
+        }
+        for name in ["vec3_x", "vec3_y", "vec3_z"] {
+            assert!(provider.get_node_metadata(name).is_some(), "missing vector node: {name}");
+        }
     }
 }
 

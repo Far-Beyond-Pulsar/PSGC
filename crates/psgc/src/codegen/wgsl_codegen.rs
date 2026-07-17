@@ -10,7 +10,6 @@
 
 use std::collections::HashSet;
 
-use crate::metadata::ShaderMetadataProvider;
 use graphy::{DataResolver, DataSource, GraphDescription, GraphyError, NodeInstance, NodeMetadataProvider, ParamInfo};
 
 /// Shader stage type
@@ -22,17 +21,17 @@ pub enum ShaderStage {
 }
 
 /// WGSL shader code generator
-pub struct WGSLCodeGenerator<'a> {
+pub struct WGSLCodeGenerator<'a, P: NodeMetadataProvider> {
     graph: &'a GraphDescription,
-    metadata_provider: &'a ShaderMetadataProvider,
+    metadata_provider: &'a P,
     data_resolver: &'a DataResolver,
     stage: ShaderStage,
 }
 
-impl<'a> WGSLCodeGenerator<'a> {
+impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
     pub fn new(
         graph: &'a GraphDescription,
-        metadata_provider: &'a ShaderMetadataProvider,
+        metadata_provider: &'a P,
         data_resolver: &'a DataResolver,
         stage: ShaderStage,
     ) -> Self {
@@ -87,6 +86,10 @@ impl<'a> WGSLCodeGenerator<'a> {
     fn generate_entry_function(&self, output_node: &NodeInstance) -> Result<String, GraphyError> {
         let mut code = String::new();
 
+        // Only nodes the output actually depends on contribute code — both
+        // helper functions here and `let` bindings below.
+        let reachable = self.reachable_nodes(output_node);
+
         // Always declare the host-provided `uniforms` binding (matching the
         // preview renderer's vertex shader) so the generated fragment
         // module's bind group layout stays compatible whether or not this
@@ -97,6 +100,38 @@ impl<'a> WGSLCodeGenerator<'a> {
         code.push_str("    time: f32,\n");
         code.push_str("};\n\n");
         code.push_str("@group(0) @binding(0) var<uniform> uniforms: Uniforms;\n\n");
+
+        // Emit each reachable node's module-scope helper functions exactly
+        // once (dedup by name, first definition wins). WGSL permits forward
+        // references between module-scope functions, so emission order is a
+        // readability nicety, not a correctness requirement.
+        let mut emitted: std::collections::HashMap<&str, &str> = std::collections::HashMap::new();
+        for node_id in self.data_resolver.get_pure_evaluation_order() {
+            if !reachable.contains(node_id) {
+                continue;
+            }
+            let Some(node) = self.graph.nodes.get(node_id) else { continue };
+            let Some(node_meta) = self.metadata_provider.get_node_metadata(&node.node_type) else {
+                continue;
+            };
+            for (name, source) in &node_meta.helper_functions {
+                match emitted.get(name.as_str()) {
+                    None => {
+                        emitted.insert(name.as_str(), source.as_str());
+                        code.push_str(source);
+                        code.push_str("\n\n");
+                    }
+                    Some(prev) if *prev != source.as_str() => {
+                        tracing::warn!(
+                            "WGSL helper '{}' redefined with different source by node type '{}'; keeping first definition",
+                            name,
+                            node.node_type
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         // Generate function signature based on stage
         let (output_param, output_type) = match self.stage {
@@ -131,8 +166,6 @@ impl<'a> WGSLCodeGenerator<'a> {
         // dangling/invalid input could generate WGSL that fails to compile
         // and crashes the renderer even though it has no effect on the
         // result.
-        let reachable = self.reachable_nodes(output_node);
-
         for node_id in self.data_resolver.get_pure_evaluation_order() {
             if !reachable.contains(node_id) {
                 continue;
@@ -298,5 +331,156 @@ fn default_value_for_type(type_str: &str) -> String {
         "vec3<f32>" => "vec3<f32>(0.0, 0.0, 0.0)".to_string(),
         "vec4<f32>" => "vec4<f32>(0.0, 0.0, 0.0, 1.0)".to_string(),
         _ => "0.0".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod helper_emission_tests {
+    use super::*;
+    use graphy::core::{NodeMetadata, NodeMetadataProvider};
+    use graphy::{
+        Connection, ConnectionType, DataResolver, DataType, GraphDescription, NodeInstance,
+        NodeTypes, Pin, PinInstance, PinType, Position,
+    };
+    use std::collections::HashMap;
+
+    struct TestProvider {
+        nodes: HashMap<String, NodeMetadata>,
+    }
+
+    impl TestProvider {
+        fn new(metas: Vec<NodeMetadata>) -> Self {
+            Self {
+                nodes: metas.into_iter().map(|m| (m.name.clone(), m)).collect(),
+            }
+        }
+    }
+
+    impl NodeMetadataProvider for TestProvider {
+        fn get_node_metadata(&self, node_type: &str) -> Option<&NodeMetadata> {
+            self.nodes.get(node_type)
+        }
+        fn get_all_nodes(&self) -> Vec<&NodeMetadata> {
+            self.nodes.values().collect()
+        }
+        fn get_nodes_by_category(&self, category: &str) -> Vec<&NodeMetadata> {
+            self.nodes.values().filter(|m| m.category == category).collect()
+        }
+    }
+
+    fn scalar_node(graph: &mut GraphDescription, id: &str, node_type: &str) {
+        let mut n = NodeInstance::new(id, node_type, Position { x: 0.0, y: 0.0 });
+        n.inputs.push(PinInstance::new(
+            format!("{id}_x"),
+            Pin::new(format!("{id}_x"), "x", DataType::Data(crate::TypeInfo::new("f32")), PinType::Input),
+        ));
+        n.outputs.push(PinInstance::new(
+            format!("{id}_result"),
+            Pin::new(format!("{id}_result"), "result", DataType::Data(crate::TypeInfo::new("f32")), PinType::Output),
+        ));
+        graph.add_node(n);
+    }
+
+    fn build_graph_and_provider() -> (GraphDescription, TestProvider) {
+        let provider = TestProvider::new(vec![
+            NodeMetadata::new("noisy_scalar", NodeTypes::pure, "Test")
+                .with_params(vec![graphy::ParamInfo::new("x", "f32")])
+                .with_return_type("f32")
+                .with_helpers(&[
+                    ("pn_shared_hash", "fn pn_shared_hash(x: f32) -> f32 { return fract(x * 0.1031); }"),
+                    ("pn_noisy", "fn pn_noisy(x: f32) -> f32 { return pn_shared_hash(x) * 2.0; }"),
+                ])
+                .with_source("pn_noisy(x)"),
+            NodeMetadata::new("noisy_to_color", NodeTypes::pure, "Test")
+                .with_params(vec![graphy::ParamInfo::new("x", "f32")])
+                .with_return_type("vec4<f32>")
+                .with_helpers(&[
+                    ("pn_shared_hash", "fn pn_shared_hash(x: f32) -> f32 { return fract(x * 0.1031); }"),
+                    ("pn_to_color", "fn pn_to_color(x: f32) -> vec4<f32> { let v = pn_shared_hash(x); return vec4<f32>(v, v, v, 1.0); }"),
+                ])
+                .with_source("pn_to_color(x)"),
+            NodeMetadata::new("fragment_output", NodeTypes::pure, "Output")
+                .with_params(vec![graphy::ParamInfo::new("color", "vec4<f32>")])
+                .with_return_type("vec4<f32>")
+                .with_source("color"),
+        ]);
+
+        let mut graph = GraphDescription::new("helper_test");
+        scalar_node(&mut graph, "n1", "noisy_scalar");
+        scalar_node(&mut graph, "n2", "noisy_to_color");
+
+        let mut out = NodeInstance::new("out", "fragment_output", Position { x: 0.0, y: 0.0 });
+        out.inputs.push(PinInstance::new(
+            "out_color",
+            Pin::new("out_color", "color", DataType::Data(crate::TypeInfo::new("vec4<f32>")), PinType::Input),
+        ));
+        graph.add_node(out);
+
+        graph.add_connection(Connection::new("n1", "n1_result", "n2", "n2_x", ConnectionType::Data));
+        graph.add_connection(Connection::new("n2", "n2_result", "out", "out_color", ConnectionType::Data));
+        (graph, provider)
+    }
+
+    fn generate(graph: &GraphDescription, provider: &TestProvider) -> String {
+        let resolver = DataResolver::build(graph, provider).expect("data flow");
+        WGSLCodeGenerator::new(graph, provider, &resolver, ShaderStage::Fragment)
+            .generate_shader()
+            .expect("codegen")
+    }
+
+    #[test]
+    fn helpers_emitted_once_at_module_scope() {
+        let (graph, provider) = build_graph_and_provider();
+        let wgsl = generate(&graph, &provider);
+
+        assert_eq!(wgsl.matches("fn pn_shared_hash").count(), 1, "shared helper deduped:\n{wgsl}");
+        assert_eq!(wgsl.matches("fn pn_noisy").count(), 1);
+        assert_eq!(wgsl.matches("fn pn_to_color").count(), 1);
+
+        let entry = wgsl.find("@fragment").expect("entry marker");
+        for helper in ["fn pn_shared_hash", "fn pn_noisy", "fn pn_to_color"] {
+            assert!(wgsl.find(helper).unwrap() < entry, "{helper} must precede @fragment");
+        }
+    }
+
+    #[test]
+    fn unreachable_nodes_contribute_no_helpers() {
+        let (mut graph, mut provider) = build_graph_and_provider();
+        // A node type with a UNIQUE helper, instantiated but never connected
+        // to the output — its helper must not be emitted.
+        provider.nodes.insert(
+            "orphan_only".to_string(),
+            NodeMetadata::new("orphan_only", NodeTypes::pure, "Test")
+                .with_params(vec![graphy::ParamInfo::new("x", "f32")])
+                .with_return_type("f32")
+                .with_helpers(&[("pn_orphan_helper", "fn pn_orphan_helper(x: f32) -> f32 { return x; }")])
+                .with_source("pn_orphan_helper(x)"),
+        );
+        scalar_node(&mut graph, "orphan", "orphan_only");
+        let wgsl = generate(&graph, &provider);
+        assert!(!wgsl.contains("fn pn_orphan_helper"), "unreachable node's helper must not be emitted:\n{wgsl}");
+        assert_eq!(wgsl.matches("fn pn_shared_hash").count(), 1);
+    }
+
+    #[test]
+    fn helper_free_nodes_generate_unchanged() {
+        let provider = TestProvider::new(vec![NodeMetadata::new(
+            "fragment_output",
+            NodeTypes::pure,
+            "Output",
+        )
+        .with_params(vec![graphy::ParamInfo::new("color", "vec4<f32>")])
+        .with_return_type("vec4<f32>")
+        .with_source("color")]);
+        let mut graph = GraphDescription::new("plain");
+        let mut out = NodeInstance::new("out", "fragment_output", Position { x: 0.0, y: 0.0 });
+        out.inputs.push(PinInstance::new(
+            "out_color",
+            Pin::new("out_color", "color", DataType::Data(crate::TypeInfo::new("vec4<f32>")), PinType::Input),
+        ));
+        graph.add_node(out);
+        let wgsl = generate(&graph, &provider);
+        assert!(!wgsl.contains("fn pn_"), "no helpers expected:\n{wgsl}");
+        assert!(wgsl.contains("@fragment"));
     }
 }
