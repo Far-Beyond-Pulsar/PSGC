@@ -294,7 +294,8 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
     ///
     /// Since every pure node already has a `let` binding emitted (in
     /// dependency order) before any of its dependents, a connected input is
-    /// simply a reference to that variable.
+    /// simply a reference to that variable — optionally followed by a field
+    /// accessor for multi-output nodes (Break, etc.).
     fn generate_input_expression(
         &self,
         node_id: &str,
@@ -302,14 +303,41 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
         param_type: &str,
     ) -> Result<String, GraphyError> {
         match self.data_resolver.get_input_source(node_id, pin_name) {
-            Some(DataSource::Connection { source_node_id, .. }) => self
-                .data_resolver
-                .get_result_variable(source_node_id)
-                .cloned()
-                .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", source_node_id))),
+            Some(DataSource::Connection { source_node_id, source_pin }) => {
+                let var = self
+                    .data_resolver
+                    .get_result_variable(source_node_id)
+                    .cloned()
+                    .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", source_node_id)))?;
+                // Append accessor for multi-output nodes (e.g. ".r", ".g").
+                let accessor = self.source_pin_accessor(source_node_id, source_pin);
+                Ok(format!("{}{}", var, accessor))
+            }
             Some(DataSource::Constant(value)) => Ok(value.clone()),
             Some(DataSource::Default) | None => Ok(default_value_for_type(param_type)),
         }
+    }
+
+    /// Look up the field accessor (`.r`, `[0]`, …) for `source_pin` on the
+    /// node `source_node_id`.  Returns the empty string for the default
+    /// single-output case.
+    fn source_pin_accessor(&self, source_node_id: &str, source_pin: &str) -> String {
+        let Some(node) = self.graph.nodes.get(source_node_id) else {
+            return String::new();
+        };
+        let Some(meta) = self.metadata_provider.get_node_metadata(&node.node_type) else {
+            return String::new();
+        };
+        let outputs = meta.effective_outputs();
+        // The default single-output pin is named "result" — no accessor needed.
+        if outputs.len() <= 1 && source_pin == "result" {
+            return String::new();
+        }
+        outputs
+            .iter()
+            .find(|o| o.name == source_pin)
+            .map(|o| o.accessor.clone())
+            .unwrap_or_default()
     }
 
     /// Map a built-in "Input" category node (e.g. `frag_position`,

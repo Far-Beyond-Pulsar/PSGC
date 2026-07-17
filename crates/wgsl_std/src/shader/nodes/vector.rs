@@ -140,55 +140,54 @@ pub fn make_vec4() -> NodeMetadata {
 }
 
 // ============================================================================
-// Break nodes — extract individual components from vectors
+// Break nodes — multi-output component extraction
 // ============================================================================
-
-const PN_BREAK_VEC2: (&str, &str) = ("pn_break_vec2", r#"fn pn_break_vec2(v: vec2<f32>, i: i32) -> f32 {
-    return select(v.g, v.r, i == 0);
-}"#);
-
-const PN_BREAK_VEC3: (&str, &str) = ("pn_break_vec3", r#"fn pn_break_vec3(v: vec3<f32>, i: i32) -> f32 {
-    return select(select(v.b, v.g, i == 1), v.r, i == 0);
-}"#);
-
-const PN_BREAK_VEC4: (&str, &str) = ("pn_break_vec4", r#"fn pn_break_vec4(v: vec4<f32>, i: i32) -> f32 {
-    return select(select(v.a, v.b, i == 2), select(v.g, v.r, i == 0), i == 1);
-}"#);
+//
+// Each Break node stores the whole input vector in a single `let` binding.
+// Downstream consumers reference individual components via the output pin's
+// accessor string (e.g. `.r`, `.g`), which the codegen appends at the call
+// site — the Break node itself produces exactly one variable.
+//
+//   let N_result = v;          // single binding
+//   … = N_result.r * 2.0;      // consumer appends .r
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn break_vec2() -> NodeMetadata {
     NodeMetadata::new("break_vec2", NodeTypes::pure, "Vector")
-        .with_params(vec![
-            ParamInfo::new("v", "vec2<f32>"),
-            ParamInfo::new("index", "i32"),
+        .with_params(vec![ParamInfo::new("v", "vec2<f32>")])
+        .with_return_type("vec2<f32>")
+        .with_source("v")
+        .with_outputs(vec![
+            graphy::core::OutputParam::new("r", "f32", ".r"),
+            graphy::core::OutputParam::new("g", "f32", ".g"),
         ])
-        .with_return_type("f32")
-        .with_helpers(&[PN_BREAK_VEC2])
-        .with_source("pn_break_vec2(v, index)")
 }
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn break_vec3() -> NodeMetadata {
     NodeMetadata::new("break_vec3", NodeTypes::pure, "Vector")
-        .with_params(vec![
-            ParamInfo::new("v", "vec3<f32>"),
-            ParamInfo::new("index", "i32"),
+        .with_params(vec![ParamInfo::new("v", "vec3<f32>")])
+        .with_return_type("vec3<f32>")
+        .with_source("v")
+        .with_outputs(vec![
+            graphy::core::OutputParam::new("r", "f32", ".r"),
+            graphy::core::OutputParam::new("g", "f32", ".g"),
+            graphy::core::OutputParam::new("b", "f32", ".b"),
         ])
-        .with_return_type("f32")
-        .with_helpers(&[PN_BREAK_VEC3])
-        .with_source("pn_break_vec3(v, index)")
 }
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn break_vec4() -> NodeMetadata {
     NodeMetadata::new("break_vec4", NodeTypes::pure, "Vector")
-        .with_params(vec![
-            ParamInfo::new("v", "vec4<f32>"),
-            ParamInfo::new("index", "i32"),
+        .with_params(vec![ParamInfo::new("v", "vec4<f32>")])
+        .with_return_type("vec4<f32>")
+        .with_source("v")
+        .with_outputs(vec![
+            graphy::core::OutputParam::new("r", "f32", ".r"),
+            graphy::core::OutputParam::new("g", "f32", ".g"),
+            graphy::core::OutputParam::new("b", "f32", ".b"),
+            graphy::core::OutputParam::new("a", "f32", ".a"),
         ])
-        .with_return_type("f32")
-        .with_helpers(&[PN_BREAK_VEC4])
-        .with_source("pn_break_vec4(v, index)")
 }
 
 // ============================================================================
