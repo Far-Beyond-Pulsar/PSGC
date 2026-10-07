@@ -12,13 +12,13 @@
 //!
 //! | Pin | Type | Default | Description |
 //! |---|---|---|---|
-//! | base_color | `vec4<f32>` | `(1,1,1,1)` | Albedo / diffuse colour (RGBA) |
+//! | base_color | `vec4<f32>` | `(1,1,1,1)` | Albedo / diffuse colour (RGBA); alpha is multiplied by opacity |
 //! | metallic | `f32` | `0.0` | Metalness (0 = dielectric, 1 = metal) |
 //! | roughness | `f32` | `0.5` | Surface roughness (0 = smooth, 1 = rough) |
 //! | emissive_color | `vec4<f32>` | `(0,0,0,0)` | Self-illumination colour |
-//! | normal | `vec3<f32>` | `(0,0,1)` | World-space / tangent-space normal |
+//! | normal | `vec3<f32>` | interpolated mesh normal | World-space surface normal |
 //! | ambient_occlusion | `f32` | `1.0` | Bent-normal occlusion |
-//! | opacity | `f32` | `1.0` | Opacity (1 = opaque) |
+//! | opacity | `f32` | `1.0` | Multiplier for base-color alpha (1 = preserve alpha) |
 //! | opacity_mask | `f32` | `1.0` | Binary opacity clip threshold |
 //!
 //! > **Note:** `@location(0)` is `base_color` (vec4 — matches the existing
@@ -30,6 +30,24 @@
 use crate::SHADER_REGISTRY;
 use graphy::core::{NodeMetadata, NodeTypes, ParamInfo};
 use linkme::distributed_slice;
+
+/// WGSL expressions for unconnected fragment output pins.
+///
+/// These are material defaults, not numeric type defaults: zero opacity
+/// discards the surface and zero ambient occlusion removes indirect light.
+/// `normal` refers to the interpolated world normal in PSGC's fragment entry.
+/// Explicit constants and connections always take precedence over these values.
+pub fn fragment_output_default(pin: &str) -> Option<&'static str> {
+    match pin {
+        "base_color" => Some("vec4<f32>(1.0, 1.0, 1.0, 1.0)"),
+        "metallic" => Some("0.0"),
+        "roughness" => Some("0.5"),
+        "emissive_color" => Some("vec4<f32>(0.0, 0.0, 0.0, 0.0)"),
+        "normal" => Some("normal"),
+        "ambient_occlusion" | "opacity" | "opacity_mask" => Some("1.0"),
+        _ => None,
+    }
+}
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn fragment_output() -> NodeMetadata {

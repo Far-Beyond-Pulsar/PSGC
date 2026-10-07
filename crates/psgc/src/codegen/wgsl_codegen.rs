@@ -255,8 +255,8 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
         }
 
         // Build the struct literal from the output node's params.  Each
-        // field resolves to whatever is connected (or a type-appropriate
-        // default if nothing is connected).
+        // field resolves to whatever is connected (or its material default
+        // if nothing is connected).
         let struct_name = match self.stage {
             ShaderStage::Fragment => "FragmentOutput",
             ShaderStage::Vertex => "VertexOutput",
@@ -345,7 +345,18 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                 Ok(serde_json::from_str::<String>(value).unwrap_or_else(|_| value.clone()))
             }
             Some(DataSource::Constant(value)) => Ok(value.clone()),
-            Some(DataSource::Default) | None => Ok(default_value_for_type(param_type)),
+            Some(DataSource::Default) | None => {
+                let material_default = self.graph.nodes.get(node_id).and_then(|node| {
+                    if node.node_type == "fragment_output" {
+                        wgsl_std::fragment_output_default(pin_name)
+                    } else {
+                        None
+                    }
+                });
+                Ok(material_default
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| default_value_for_type(param_type)))
+            }
         }
     }
 
