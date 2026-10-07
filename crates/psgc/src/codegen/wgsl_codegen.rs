@@ -313,6 +313,15 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                 let accessor = self.source_pin_accessor(source_node_id, source_pin);
                 Ok(format!("{}{}", var, accessor))
             }
+            Some(DataSource::Constant(value)) if is_opaque_handle_type(param_type) => {
+                // Asset references enter the graph as string-valued reflected
+                // properties, but WGSL texture/sampler handles are identifiers,
+                // not string literals. Lower the serialized string contents to
+                // the resource expression here, after the graph's typed pin has
+                // already been validated against its opaque handle type.
+                Ok(serde_json::from_str::<String>(value)
+                    .unwrap_or_else(|_| value.clone()))
+            }
             Some(DataSource::Constant(value)) => Ok(value.clone()),
             Some(DataSource::Default) | None => Ok(default_value_for_type(param_type)),
         }
@@ -356,6 +365,10 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             _ => default_value_for_type(return_type),
         }
     }
+}
+
+fn is_opaque_handle_type(type_name: &str) -> bool {
+    type_name.starts_with("texture_") || type_name.starts_with("sampler")
 }
 
 /// Expand a node's `function_source` expression template, substituting each
