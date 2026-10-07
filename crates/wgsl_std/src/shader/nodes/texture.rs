@@ -45,4 +45,3 @@ pub fn sample_texture_grad() -> NodeMetadata {
         .with_return_type("vec4<f32>")
         .with_source("textureSampleGrad(texture, texture_sampler, uv, ddx, ddy)")
 }
-
