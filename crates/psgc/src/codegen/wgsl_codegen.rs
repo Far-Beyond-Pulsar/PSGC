@@ -344,7 +344,30 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                 // already been validated against its opaque handle type.
                 Ok(serde_json::from_str::<String>(value).unwrap_or_else(|_| value.clone()))
             }
-            Some(DataSource::Constant(value)) => Ok(value.clone()),
+            Some(DataSource::Constant(value)) => {
+                // Graphy's generic constant formatter uses tuples for JSON
+                // vectors. WGSL needs an explicitly typed vector constructor.
+                let width = match param_type {
+                    "vec2<f32>" => Some(2),
+                    "vec3<f32>" => Some(3),
+                    "vec4<f32>" => Some(4),
+                    _ => None,
+                };
+                if let Some(width) = width {
+                    if let Some(serde_json::Value::Array(items)) = self.graph.nodes.get(node_id)
+                        .and_then(|node| node.properties.get(pin_name))
+                    {
+                        if items.len() != width || items.iter().any(|item| !item.is_number()) {
+                            return Err(GraphyError::CodeGeneration(format!(
+                                "Input {node_id}.{pin_name} requires {width} numeric components for {param_type}"
+                            )));
+                        }
+                        let components = items.iter().map(|item| item.to_string()).collect::<Vec<_>>().join(", ");
+                        return Ok(format!("{param_type}({components})"));
+                    }
+                }
+                Ok(value.clone())
+            }
             Some(DataSource::Default) | None => {
                 let material_default = self.graph.nodes.get(node_id).and_then(|node| {
                     if node.node_type == "fragment_output" {
