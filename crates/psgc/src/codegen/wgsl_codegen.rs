@@ -10,7 +10,10 @@
 
 use std::collections::HashSet;
 
-use graphy::{DataResolver, DataSource, GraphDescription, GraphyError, NodeInstance, NodeMetadataProvider, ParamInfo};
+use graphy::{
+    DataResolver, DataSource, GraphDescription, GraphyError, NodeInstance, NodeMetadataProvider,
+    ParamInfo,
+};
 
 /// Shader stage type
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +62,8 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             ShaderStage::Fragment => "fragment_output",
             ShaderStage::Compute => {
                 return Err(GraphyError::CodeGeneration(
-                    "Compute shaders are not yet supported by the shader graph compiler".to_string(),
+                    "Compute shaders are not yet supported by the shader graph compiler"
+                        .to_string(),
                 ));
             }
         };
@@ -119,7 +123,9 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             if !reachable.contains(node_id) {
                 continue;
             }
-            let Some(node) = self.graph.nodes.get(node_id) else { continue };
+            let Some(node) = self.graph.nodes.get(node_id) else {
+                continue;
+            };
             let Some(node_meta) = self.metadata_provider.get_node_metadata(&node.node_type) else {
                 continue;
             };
@@ -153,7 +159,10 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                 let struct_name = "FragmentOutput";
                 code.push_str(&format!("struct {} {{\n", struct_name));
                 for (i, param) in output_meta.params.iter().enumerate() {
-                    code.push_str(&format!("    @location({}) {}: {},\n", i, param.name, param.param_type));
+                    code.push_str(&format!(
+                        "    @location({}) {}: {},\n",
+                        i, param.name, param.param_type
+                    ));
                 }
                 code.push_str("};\n\n");
 
@@ -219,7 +228,9 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             let var_name = self
                 .data_resolver
                 .get_result_variable(node_id)
-                .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", node_id)))?;
+                .ok_or_else(|| {
+                    GraphyError::Custom(format!("No result variable for node: {}", node_id))
+                })?;
             let return_type = node_meta
                 .return_type
                 .as_ref()
@@ -231,7 +242,11 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
             } else {
                 let mut args = Vec::with_capacity(node_meta.params.len());
                 for param in &node_meta.params {
-                    args.push(self.generate_input_expression(node_id, &param.name, &param.param_type)?);
+                    args.push(self.generate_input_expression(
+                        node_id,
+                        &param.name,
+                        &param.param_type,
+                    )?);
                 }
                 expand_function_source(&node_meta.function_source, &node_meta.params, &args)
             };
@@ -303,12 +318,20 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
         param_type: &str,
     ) -> Result<String, GraphyError> {
         match self.data_resolver.get_input_source(node_id, pin_name) {
-            Some(DataSource::Connection { source_node_id, source_pin }) => {
+            Some(DataSource::Connection {
+                source_node_id,
+                source_pin,
+            }) => {
                 let var = self
                     .data_resolver
                     .get_result_variable(source_node_id)
                     .cloned()
-                    .ok_or_else(|| GraphyError::Custom(format!("No result variable for node: {}", source_node_id)))?;
+                    .ok_or_else(|| {
+                        GraphyError::Custom(format!(
+                            "No result variable for node: {}",
+                            source_node_id
+                        ))
+                    })?;
                 // Append accessor for multi-output nodes (e.g. ".r", ".g").
                 let accessor = self.source_pin_accessor(source_node_id, source_pin);
                 Ok(format!("{}{}", var, accessor))
@@ -319,8 +342,7 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                 // not string literals. Lower the serialized string contents to
                 // the resource expression here, after the graph's typed pin has
                 // already been validated against its opaque handle type.
-                Ok(serde_json::from_str::<String>(value)
-                    .unwrap_or_else(|_| value.clone()))
+                Ok(serde_json::from_str::<String>(value).unwrap_or_else(|_| value.clone()))
             }
             Some(DataSource::Constant(value)) => Ok(value.clone()),
             Some(DataSource::Default) | None => Ok(default_value_for_type(param_type)),
@@ -368,7 +390,9 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
 }
 
 fn is_opaque_handle_type(type_name: &str) -> bool {
-    type_name.starts_with("texture_") || type_name.starts_with("sampler")
+    type_name == "TextureSrc"
+        || type_name.starts_with("texture_")
+        || type_name.starts_with("sampler")
 }
 
 /// Expand a node's `function_source` expression template, substituting each
@@ -455,7 +479,10 @@ mod helper_emission_tests {
             self.nodes.values().collect()
         }
         fn get_nodes_by_category(&self, category: &str) -> Vec<&NodeMetadata> {
-            self.nodes.values().filter(|m| m.category == category).collect()
+            self.nodes
+                .values()
+                .filter(|m| m.category == category)
+                .collect()
         }
     }
 
@@ -463,11 +490,21 @@ mod helper_emission_tests {
         let mut n = NodeInstance::new(id, node_type, Position { x: 0.0, y: 0.0 });
         n.inputs.push(PinInstance::new(
             format!("{id}_x"),
-            Pin::new(format!("{id}_x"), "x", DataType::Data(crate::TypeInfo::new("f32")), PinType::Input),
+            Pin::new(
+                format!("{id}_x"),
+                "x",
+                DataType::Data(crate::TypeInfo::new("f32")),
+                PinType::Input,
+            ),
         ));
         n.outputs.push(PinInstance::new(
             format!("{id}_result"),
-            Pin::new(format!("{id}_result"), "result", DataType::Data(crate::TypeInfo::new("f32")), PinType::Output),
+            Pin::new(
+                format!("{id}_result"),
+                "result",
+                DataType::Data(crate::TypeInfo::new("f32")),
+                PinType::Output,
+            ),
         ));
         graph.add_node(n);
     }
@@ -503,12 +540,29 @@ mod helper_emission_tests {
         let mut out = NodeInstance::new("out", "fragment_output", Position { x: 0.0, y: 0.0 });
         out.inputs.push(PinInstance::new(
             "out_color",
-            Pin::new("out_color", "color", DataType::Data(crate::TypeInfo::new("vec4<f32>")), PinType::Input),
+            Pin::new(
+                "out_color",
+                "color",
+                DataType::Data(crate::TypeInfo::new("vec4<f32>")),
+                PinType::Input,
+            ),
         ));
         graph.add_node(out);
 
-        graph.add_connection(Connection::new("n1", "n1_result", "n2", "n2_x", ConnectionType::Data));
-        graph.add_connection(Connection::new("n2", "n2_result", "out", "out_color", ConnectionType::Data));
+        graph.add_connection(Connection::new(
+            "n1",
+            "n1_result",
+            "n2",
+            "n2_x",
+            ConnectionType::Data,
+        ));
+        graph.add_connection(Connection::new(
+            "n2",
+            "n2_result",
+            "out",
+            "out_color",
+            ConnectionType::Data,
+        ));
         (graph, provider)
     }
 
@@ -524,13 +578,20 @@ mod helper_emission_tests {
         let (graph, provider) = build_graph_and_provider();
         let wgsl = generate(&graph, &provider);
 
-        assert_eq!(wgsl.matches("fn pn_shared_hash").count(), 1, "shared helper deduped:\n{wgsl}");
+        assert_eq!(
+            wgsl.matches("fn pn_shared_hash").count(),
+            1,
+            "shared helper deduped:\n{wgsl}"
+        );
         assert_eq!(wgsl.matches("fn pn_noisy").count(), 1);
         assert_eq!(wgsl.matches("fn pn_to_color").count(), 1);
 
         let entry = wgsl.find("@fragment").expect("entry marker");
         for helper in ["fn pn_shared_hash", "fn pn_noisy", "fn pn_to_color"] {
-            assert!(wgsl.find(helper).unwrap() < entry, "{helper} must precede @fragment");
+            assert!(
+                wgsl.find(helper).unwrap() < entry,
+                "{helper} must precede @fragment"
+            );
         }
     }
 
@@ -544,12 +605,18 @@ mod helper_emission_tests {
             NodeMetadata::new("orphan_only", NodeTypes::pure, "Test")
                 .with_params(vec![graphy::ParamInfo::new("x", "f32")])
                 .with_return_type("f32")
-                .with_helpers(&[("pn_orphan_helper", "fn pn_orphan_helper(x: f32) -> f32 { return x; }")])
+                .with_helpers(&[(
+                    "pn_orphan_helper",
+                    "fn pn_orphan_helper(x: f32) -> f32 { return x; }",
+                )])
                 .with_source("pn_orphan_helper(x)"),
         );
         scalar_node(&mut graph, "orphan", "orphan_only");
         let wgsl = generate(&graph, &provider);
-        assert!(!wgsl.contains("fn pn_orphan_helper"), "unreachable node's helper must not be emitted:\n{wgsl}");
+        assert!(
+            !wgsl.contains("fn pn_orphan_helper"),
+            "unreachable node's helper must not be emitted:\n{wgsl}"
+        );
         assert_eq!(wgsl.matches("fn pn_shared_hash").count(), 1);
     }
 
@@ -567,7 +634,12 @@ mod helper_emission_tests {
         let mut out = NodeInstance::new("out", "fragment_output", Position { x: 0.0, y: 0.0 });
         out.inputs.push(PinInstance::new(
             "out_color",
-            Pin::new("out_color", "color", DataType::Data(crate::TypeInfo::new("vec4<f32>")), PinType::Input),
+            Pin::new(
+                "out_color",
+                "color",
+                DataType::Data(crate::TypeInfo::new("vec4<f32>")),
+                PinType::Input,
+            ),
         ));
         graph.add_node(out);
         let wgsl = generate(&graph, &provider);
