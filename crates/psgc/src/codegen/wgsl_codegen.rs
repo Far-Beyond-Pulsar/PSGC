@@ -354,7 +354,10 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                     _ => None,
                 };
                 if let Some(width) = width {
-                    if let Some(serde_json::Value::Array(items)) = self.graph.nodes.get(node_id)
+                    if let Some(serde_json::Value::Array(items)) = self
+                        .graph
+                        .nodes
+                        .get(node_id)
                         .and_then(|node| node.properties.get(pin_name))
                     {
                         if items.len() != width || items.iter().any(|item| !item.is_number()) {
@@ -362,7 +365,11 @@ impl<'a, P: NodeMetadataProvider> WGSLCodeGenerator<'a, P> {
                                 "Input {node_id}.{pin_name} requires {width} numeric components for {param_type}"
                             )));
                         }
-                        let components = items.iter().map(|item| item.to_string()).collect::<Vec<_>>().join(", ");
+                        let components = items
+                            .iter()
+                            .map(|item| item.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ");
                         return Ok(format!("{param_type}({components})"));
                     }
                 }
