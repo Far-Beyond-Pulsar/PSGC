@@ -22,7 +22,10 @@ use graphy::{DataResolver, GraphDescription, GraphyError};
 pub fn compile_shader(graph: &GraphDescription) -> Result<String, GraphyError> {
     // Auto-detect stage from the graph's pure dataflow output node.
     let has_vertex = graph.nodes.values().any(|n| n.node_type == "vertex_output");
-    let has_fragment = graph.nodes.values().any(|n| n.node_type == "fragment_output");
+    let has_fragment = graph
+        .nodes
+        .values()
+        .any(|n| n.node_type == "fragment_output");
 
     if has_fragment {
         compile_fragment_shader(graph)

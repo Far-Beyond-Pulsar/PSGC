@@ -45,7 +45,11 @@ pub fn vec4_to_vec3() -> NodeMetadata {
         .with_params(vec![ParamInfo::new("input", "vec4<f32>")])
         .with_return_type("vec3<f32>")
         .with_source("input.rgb")
-        .with_conversion(TypeInfo::new("vec4<f32>"), TypeInfo::new("vec3<f32>"), false)
+        .with_conversion(
+            TypeInfo::new("vec4<f32>"),
+            TypeInfo::new("vec3<f32>"),
+            false,
+        )
 }
 
 #[distributed_slice(SHADER_REGISTRY)]
@@ -54,7 +58,11 @@ pub fn vec3_to_vec2() -> NodeMetadata {
         .with_params(vec![ParamInfo::new("input", "vec3<f32>")])
         .with_return_type("vec2<f32>")
         .with_source("input.xy")
-        .with_conversion(TypeInfo::new("vec3<f32>"), TypeInfo::new("vec2<f32>"), false)
+        .with_conversion(
+            TypeInfo::new("vec3<f32>"),
+            TypeInfo::new("vec2<f32>"),
+            false,
+        )
 }
 
 #[distributed_slice(SHADER_REGISTRY)]
@@ -63,7 +71,11 @@ pub fn vec4_to_vec2() -> NodeMetadata {
         .with_params(vec![ParamInfo::new("input", "vec4<f32>")])
         .with_return_type("vec2<f32>")
         .with_source("input.xy")
-        .with_conversion(TypeInfo::new("vec4<f32>"), TypeInfo::new("vec2<f32>"), false)
+        .with_conversion(
+            TypeInfo::new("vec4<f32>"),
+            TypeInfo::new("vec2<f32>"),
+            false,
+        )
 }
 
 // ============================================================================

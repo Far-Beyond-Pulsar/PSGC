@@ -81,9 +81,7 @@ pub fn desaturate() -> NodeMetadata {
             ParamInfo::new("amount", "f32"),
         ])
         .with_return_type("vec3<f32>")
-        .with_source(
-            "mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))), amount)"
-        )
+        .with_source("mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))), amount)")
 }
 
 // ============================================================================
@@ -108,4 +106,3 @@ pub fn rainbow() -> NodeMetadata {
             "vec4<f32>(0.5 + 0.5 * cos(6.28318530718 * ((uv.x + shift) + vec3<f32>(0.0, 0.33333333, 0.66666667))), 1.0)"
         )
 }
-

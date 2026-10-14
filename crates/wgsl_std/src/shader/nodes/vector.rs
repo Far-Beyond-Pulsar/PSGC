@@ -13,10 +13,7 @@ use linkme::distributed_slice;
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn vec2_construct() -> NodeMetadata {
     NodeMetadata::new("vec2", NodeTypes::pure, "Vector")
-        .with_params(vec![
-            ParamInfo::new("x", "f32"),
-            ParamInfo::new("y", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("x", "f32"), ParamInfo::new("y", "f32")])
         .with_return_type("vec2<f32>")
         .with_source("vec2(x, y)")
 }
@@ -106,10 +103,7 @@ pub fn vec3_distance() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn make_vec2() -> NodeMetadata {
     NodeMetadata::new("make_vec2", NodeTypes::pure, "Vector")
-        .with_params(vec![
-            ParamInfo::new("x", "f32"),
-            ParamInfo::new("y", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("x", "f32"), ParamInfo::new("y", "f32")])
         .with_return_type("vec2<f32>")
         .with_source("vec2<f32>(x, y)")
 }

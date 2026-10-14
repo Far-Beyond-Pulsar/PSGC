@@ -13,10 +13,7 @@ use linkme::distributed_slice;
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn add() -> NodeMetadata {
     NodeMetadata::new("add", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("a + b")
 }
@@ -24,10 +21,7 @@ pub fn add() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn subtract() -> NodeMetadata {
     NodeMetadata::new("subtract", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("a - b")
 }
@@ -35,10 +29,7 @@ pub fn subtract() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn multiply() -> NodeMetadata {
     NodeMetadata::new("multiply", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("a * b")
 }
@@ -46,10 +37,7 @@ pub fn multiply() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn divide() -> NodeMetadata {
     NodeMetadata::new("divide", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("a / b")
 }
@@ -196,10 +184,7 @@ pub fn round() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn math_min() -> NodeMetadata {
     NodeMetadata::new("min", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("min(a, b)")
 }
@@ -207,10 +192,7 @@ pub fn math_min() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn math_max() -> NodeMetadata {
     NodeMetadata::new("max", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("max(a, b)")
 }
@@ -249,10 +231,7 @@ pub fn math_sign() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn modulo() -> NodeMetadata {
     NodeMetadata::new("modulo", NodeTypes::pure, "Math")
-        .with_params(vec![
-            ParamInfo::new("a", "f32"),
-            ParamInfo::new("b", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("a", "f32"), ParamInfo::new("b", "f32")])
         .with_return_type("f32")
         .with_source("a - b * floor(a / b)")
 }
@@ -272,4 +251,3 @@ pub fn negate() -> NodeMetadata {
         .with_return_type("f32")
         .with_source("-x")
 }
-
