@@ -48,7 +48,7 @@ use graphy::core::NodeMetadata;
 use linkme::distributed_slice;
 
 /// Global registry of all shader nodes
-/// 
+///
 /// This slice is populated at compile-time by the `#[distributed_slice]` attribute
 #[distributed_slice]
 pub static SHADER_REGISTRY: [fn() -> NodeMetadata] = [..];

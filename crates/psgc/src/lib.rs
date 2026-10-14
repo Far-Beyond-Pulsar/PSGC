@@ -37,30 +37,22 @@
 //! 3. **Execution Flow Analysis** - Map shader stages (via Graphy)
 //! 4. **Code Generation** - Generate WGSL shader code
 
-pub mod metadata;
 pub mod codegen;
 pub mod compiler;
+pub mod metadata;
 
 // Re-export the main compilation API
-pub use compiler::{
-    compile_shader,
-    compile_vertex_shader,
-    compile_fragment_shader,
-};
 pub use codegen::ShaderStage;
+pub use compiler::{compile_fragment_shader, compile_shader, compile_vertex_shader};
 
 // Re-export Graphy types for convenience
 pub use graphy::{
-    GraphDescription, NodeInstance, Connection, Pin, PinInstance,
-    DataType, NodeTypes, Position, ConnectionType, PropertyValue,
-    GraphMetadata, Result, GraphyError, PinType,
+    Connection, ConnectionType, DataType, GraphDescription, GraphMetadata, GraphyError,
+    NodeInstance, NodeTypes, Pin, PinInstance, PinType, Position, PropertyValue, Result,
 };
 
 // Re-export core types
 pub use graphy::core::TypeInfo;
 
 // Re-export metadata types
-pub use metadata::{
-    ShaderMetadataProvider,
-    get_shader_nodes,
-};
+pub use metadata::{get_shader_nodes, ShaderMetadataProvider};

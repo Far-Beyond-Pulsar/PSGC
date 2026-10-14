@@ -2,12 +2,12 @@
 //!
 //! Integrates wgsl_std shader nodes into PSGC's metadata system
 
-use graphy::NodeMetadataProvider;
 use graphy::core::NodeMetadata;
+use graphy::NodeMetadataProvider;
 use std::collections::HashMap;
 
 /// PSGC shader metadata provider
-/// 
+///
 /// Loads shader nodes from wgsl_std registry and provides them to the compiler
 pub struct ShaderMetadataProvider {
     nodes: HashMap<String, NodeMetadata>,
@@ -21,7 +21,11 @@ impl ShaderMetadataProvider {
         // Load all shader nodes from wgsl_std registry
         for node_fn in wgsl_std::SHADER_REGISTRY.iter() {
             let metadata = node_fn();
-            tracing::debug!("[PSGC] Loaded shader node: {} ({})", metadata.name, metadata.category);
+            tracing::debug!(
+                "[PSGC] Loaded shader node: {} ({})",
+                metadata.name,
+                metadata.category
+            );
             nodes.insert(metadata.name.clone(), metadata);
         }
 
@@ -45,9 +49,12 @@ impl NodeMetadataProvider for ShaderMetadataProvider {
     fn get_all_nodes(&self) -> Vec<&NodeMetadata> {
         self.nodes.values().collect()
     }
-    
+
     fn get_nodes_by_category(&self, category: &str) -> Vec<&NodeMetadata> {
-        self.nodes.values().filter(|m| m.category == category).collect()
+        self.nodes
+            .values()
+            .filter(|m| m.category == category)
+            .collect()
     }
 }
 

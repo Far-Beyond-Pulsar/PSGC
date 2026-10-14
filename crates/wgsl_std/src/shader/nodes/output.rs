@@ -51,26 +51,24 @@ pub fn fragment_output_default(pin: &str) -> Option<&'static str> {
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn fragment_output() -> NodeMetadata {
-    NodeMetadata::new("fragment_output", NodeTypes::pure, "Output")
-        .with_params(vec![
-            ParamInfo::new("base_color", "vec4<f32>"),
-            ParamInfo::new("metallic", "f32"),
-            ParamInfo::new("roughness", "f32"),
-            ParamInfo::new("emissive_color", "vec4<f32>"),
-            ParamInfo::new("normal", "vec3<f32>"),
-            ParamInfo::new("ambient_occlusion", "f32"),
-            ParamInfo::new("opacity", "f32"),
-            ParamInfo::new("opacity_mask", "f32"),
-        ])
+    NodeMetadata::new("fragment_output", NodeTypes::pure, "Output").with_params(vec![
+        ParamInfo::new("base_color", "vec4<f32>"),
+        ParamInfo::new("metallic", "f32"),
+        ParamInfo::new("roughness", "f32"),
+        ParamInfo::new("emissive_color", "vec4<f32>"),
+        ParamInfo::new("normal", "vec3<f32>"),
+        ParamInfo::new("ambient_occlusion", "f32"),
+        ParamInfo::new("opacity", "f32"),
+        ParamInfo::new("opacity_mask", "f32"),
+    ])
 }
 
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn vertex_output() -> NodeMetadata {
-    NodeMetadata::new("vertex_output", NodeTypes::pure, "Output")
-        .with_params(vec![
-            ParamInfo::new("position", "vec4<f32>"),
-            ParamInfo::new("uv", "vec2<f32>"),
-            ParamInfo::new("normal", "vec3<f32>"),
-            ParamInfo::new("world_position", "vec3<f32>"),
-        ])
+    NodeMetadata::new("vertex_output", NodeTypes::pure, "Output").with_params(vec![
+        ParamInfo::new("position", "vec4<f32>"),
+        ParamInfo::new("uv", "vec2<f32>"),
+        ParamInfo::new("normal", "vec3<f32>"),
+        ParamInfo::new("world_position", "vec3<f32>"),
+    ])
 }

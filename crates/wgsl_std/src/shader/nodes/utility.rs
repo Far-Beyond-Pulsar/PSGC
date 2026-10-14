@@ -19,10 +19,7 @@ pub fn constant_f32() -> NodeMetadata {
 #[distributed_slice(SHADER_REGISTRY)]
 pub fn constant_vec2() -> NodeMetadata {
     NodeMetadata::new("constant_vec2", NodeTypes::pure, "Utility")
-        .with_params(vec![
-            ParamInfo::new("x", "f32"),
-            ParamInfo::new("y", "f32"),
-        ])
+        .with_params(vec![ParamInfo::new("x", "f32"), ParamInfo::new("y", "f32")])
         .with_return_type("vec2<f32>")
         .with_source("vec2<f32>(x, y)")
 }
