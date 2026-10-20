@@ -64,7 +64,7 @@ fn compile_shader_with_stage(
 
     // Phase 1: Get shader metadata
     tracing::info!("[PSGC] Phase 1: Loading shader node metadata...");
-    let metadata_provider = ShaderMetadataProvider::new();
+    let metadata_provider = ShaderMetadataProvider::global().clone();
     tracing::info!(
         "[PSGC] Loaded {} shader node types",
         metadata_provider.get_all_nodes().len()

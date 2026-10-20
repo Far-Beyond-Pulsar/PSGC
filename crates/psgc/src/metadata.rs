@@ -5,12 +5,15 @@
 use graphy::core::NodeMetadata;
 use graphy::NodeMetadataProvider;
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 /// PSGC shader metadata provider
 ///
 /// Loads shader nodes from wgsl_std registry and provides them to the compiler
+#[derive(Clone)]
 pub struct ShaderMetadataProvider {
-    nodes: HashMap<String, NodeMetadata>,
+    nodes: Arc<HashMap<String, NodeMetadata>>,
 }
 
 impl ShaderMetadataProvider {
@@ -31,7 +34,18 @@ impl ShaderMetadataProvider {
 
         tracing::info!("[PSGC] Loaded {} shader nodes from wgsl_std", nodes.len());
 
-        Self { nodes }
+        Self {
+            nodes: Arc::new(nodes),
+        }
+    }
+
+    /// Shared immutable registry for shader compilation. Node metadata comes
+    /// from the static `wgsl_std` registry and does not change at runtime, so
+    /// rebuilding 128 definitions for every graph needlessly multiplies
+    /// startup CPU work when a scene loads many materials at once.
+    pub fn global() -> &'static Self {
+        static PROVIDER: OnceLock<ShaderMetadataProvider> = OnceLock::new();
+        PROVIDER.get_or_init(Self::new)
     }
 }
 
