@@ -3,7 +3,7 @@
 //! Vertex shader inputs and fragment shader inputs
 
 use crate::SHADER_REGISTRY;
-use graphy::core::{NodeMetadata, NodeTypes, ParamInfo};
+use graphy::core::{NodeMetadata, NodeTypes};
 use linkme::distributed_slice;
 
 // ============================================================================
